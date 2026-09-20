@@ -1,25 +1,32 @@
-import type { ILoaderResource } from "@pixi/loaders"
-import { glTFAsset } from "../gltf/gltf-asset"
-import { Compatibility } from "../compatibility/compatibility"
-import { LoaderResourceResponseType } from "../compatibility/compatibility-version"
+import { checkExtension, DOMAdapter, extensions, ExtensionType, LoaderParserPriority } from "pixi.js"
+import type { Loader, LoaderParser, ResolvedAsset } from "pixi.js"
+import { glTFAsset, glTFUrlResourceLoader } from "../gltf/gltf-asset"
 
-export const glTFBinaryLoader = {
-  use: function (resource: ILoaderResource, next: () => void) {
-    if (resource.extension !== "glb") {
-      return next()
-    }
-    if (glTFAsset.isValidBuffer(resource.data)) {
-      glTFAsset.fromBuffer(resource.data, gltf => {
-        Object.assign(resource, { gltf }); next()
-      })
-    } else {
-      return next()
-    }
+/**
+ * Load parser for binary glTF (`.glb`) files: `Assets.load("model.glb")`
+ * resolves to a `glTFAsset`.
+ */
+export const glTFBinaryLoader: LoaderParser<glTFAsset> = {
+  extension: {
+    type: ExtensionType.LoadParser,
+    priority: LoaderParserPriority.Normal,
+    name: "glb",
   },
-  add: function () {
-    Compatibility.setLoaderResourceExtensionType("glb",
-      LoaderResourceResponseType.buffer)
-  }
+  id: "glb",
+  // Deprecated in favour of `id`, but PixiJS 8.20 still validates parsers by
+  // name: two parsers without one are reported as a conflict.
+  name: "glb",
+  test(url: string) {
+    return checkExtension(url, ".glb")
+  },
+  async load(url: string, _asset?: ResolvedAsset, loader?: Loader): Promise<glTFAsset> {
+    const response = await DOMAdapter.get().fetch(url)
+    const data = await response.arrayBuffer()
+    if (!glTFAsset.isValidBuffer(data)) {
+      throw new Error(`PIXI3D: "${url}" is not a valid binary glTF file.`)
+    }
+    return glTFAsset.fromBuffer(data, undefined, new glTFUrlResourceLoader(url, loader))
+  },
 }
 
-Compatibility.installLoaderPlugin("cubemap", glTFBinaryLoader)
+extensions.add(glTFBinaryLoader)

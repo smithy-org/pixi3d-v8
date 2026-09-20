@@ -1,7 +1,7 @@
-import { Texture, BaseTexture } from "@pixi/core"
-import { ALPHA_MODES, WRAP_MODES } from "@pixi/constants"
-
+import { ImageSource, Texture } from "pixi.js"
+import type { WRAP_MODE } from "pixi.js"
 import { glTFChannel } from "./animation/gltf-channel"
+import type { glTFTexture } from "./gltf-texture"
 import { glTFAsset } from "./gltf-asset"
 import { glTFAnimation } from "./animation/gltf-animation"
 import { glTFAttribute } from "./gltf-attribute"
@@ -128,36 +128,15 @@ export class glTFParser {
       return this._materialFactory.create(result)
     }
     if (material.occlusionTexture !== undefined) {
-      result.occlusionTexture = this._asset.textures[material.occlusionTexture.index].clone()
+      result.occlusionTexture = this.parseTextureInfo(material.occlusionTexture)
       result.occlusionTexture.strength = material.occlusionTexture.strength
-      result.occlusionTexture.texCoord = material.occlusionTexture.texCoord
-      if (material.occlusionTexture.extensions && material.occlusionTexture.extensions.KHR_texture_transform) {
-        result.occlusionTexture.transform = material.occlusionTexture.extensions.KHR_texture_transform
-        if (material.occlusionTexture.extensions.KHR_texture_transform.texCoord !== undefined) {
-          result.occlusionTexture.texCoord = material.occlusionTexture.extensions.KHR_texture_transform.texCoord
-        }
-      }
     }
     if (material.normalTexture !== undefined) {
-      result.normalTexture = this._asset.textures[material.normalTexture.index].clone()
+      result.normalTexture = this.parseTextureInfo(material.normalTexture)
       result.normalTexture.scale = material.normalTexture.scale || 1
-      result.normalTexture.texCoord = material.normalTexture.texCoord
-      if (material.normalTexture.extensions && material.normalTexture.extensions.KHR_texture_transform) {
-        result.normalTexture.transform = material.normalTexture.extensions.KHR_texture_transform
-        if (material.normalTexture.extensions.KHR_texture_transform.texCoord !== undefined) {
-          result.normalTexture.texCoord = material.normalTexture.extensions.KHR_texture_transform.texCoord
-        }
-      }
     }
     if (material.emissiveTexture !== undefined) {
-      result.emissiveTexture = this._asset.textures[material.emissiveTexture.index].clone()
-      result.emissiveTexture.texCoord = material.emissiveTexture.texCoord
-      if (material.emissiveTexture.extensions && material.emissiveTexture.extensions.KHR_texture_transform) {
-        result.emissiveTexture.transform = material.emissiveTexture.extensions.KHR_texture_transform
-        if (material.emissiveTexture.extensions.KHR_texture_transform.texCoord !== undefined) {
-          result.emissiveTexture.texCoord = material.emissiveTexture.extensions.KHR_texture_transform.texCoord
-        }
-      }
+      result.emissiveTexture = this.parseTextureInfo(material.emissiveTexture)
     }
     if (material.doubleSided !== undefined) {
       result.doubleSided = material.doubleSided
@@ -173,27 +152,13 @@ export class glTFParser {
     }
     let pbr = material.pbrMetallicRoughness
     if (pbr?.metallicRoughnessTexture !== undefined) {
-      result.metallicRoughnessTexture = this._asset.textures[pbr.metallicRoughnessTexture.index].clone()
-      result.metallicRoughnessTexture.texCoord = pbr.metallicRoughnessTexture.texCoord
-      if (pbr.metallicRoughnessTexture.extensions && pbr.metallicRoughnessTexture.extensions.KHR_texture_transform) {
-        result.metallicRoughnessTexture.transform = pbr.metallicRoughnessTexture.extensions.KHR_texture_transform
-        if (pbr.metallicRoughnessTexture.extensions.KHR_texture_transform.texCoord !== undefined) {
-          result.metallicRoughnessTexture.texCoord = pbr.metallicRoughnessTexture.extensions.KHR_texture_transform.texCoord
-        }
-      }
+      result.metallicRoughnessTexture = this.parseTextureInfo(pbr.metallicRoughnessTexture)
     }
     if (pbr?.baseColorFactor) {
       result.baseColor = pbr.baseColorFactor
     }
     if (pbr?.baseColorTexture !== undefined) {
-      result.baseColorTexture = this._asset.textures[pbr.baseColorTexture.index].clone()
-      result.baseColorTexture.texCoord = pbr.baseColorTexture.texCoord
-      if (pbr.baseColorTexture.extensions && pbr.baseColorTexture.extensions.KHR_texture_transform) {
-        result.baseColorTexture.transform = pbr.baseColorTexture.extensions.KHR_texture_transform
-        if (pbr.baseColorTexture.extensions.KHR_texture_transform.texCoord !== undefined) {
-          result.baseColorTexture.texCoord = pbr.baseColorTexture.extensions.KHR_texture_transform.texCoord
-        }
-      }
+      result.baseColorTexture = this.parseTextureInfo(pbr.baseColorTexture)
     }
     if (pbr?.metallicFactor !== undefined) {
       result.metallic = pbr.metallicFactor
@@ -208,58 +173,79 @@ export class glTFParser {
   }
 
   /**
-   * Returns the texture used by the specified object.
-   * @param source The source object or index.
+   * Creates a material texture from a glTF texture info object (the
+   * `{ index, texCoord, extensions }` reference a material makes to a
+   * texture). Each material gets its own `Texture` over the shared source so
+   * the per-material uv set and transform do not leak between materials.
+   * @param info The texture info object.
    */
-  parseTexture(index: number) {
-    const texture = this._descriptor.textures[index];
-    const image = this._asset.images[this.findTextureSource(texture)];
-    const result = new Texture(
-      new BaseTexture(image.baseTexture.resource, {
-        wrapMode: WRAP_MODES.REPEAT,
-        // Went back and forth about NO_PREMULTIPLIED_ALPHA. The default in
-        // PixiJS is to have premultiplied alpha textures, but this may not work
-        // so well when rendering objects as opaque (which have alpha equal to 0).
-        // In that case it's impossible to retrieve the original RGB values,
-        // because they are all zero when using premultiplied alpha. Both the glTF
-        // Sample Viewer and Babylon.js uses NO_PREMULTIPLIED_ALPHA so decided to
-        // do the same.
-        alphaMode: ALPHA_MODES.NO_PREMULTIPLIED_ALPHA,
-      })
-    );
-    if (this._descriptor.samplers && texture.sampler !== undefined) {
-      const sampler = this._descriptor.samplers[texture.sampler];
-      switch (sampler.wrapS) {
-        case 10497:
-          result.baseTexture.wrapMode = WRAP_MODES.REPEAT;
-          break;
-        case 33648:
-          result.baseTexture.wrapMode = WRAP_MODES.MIRRORED_REPEAT;
-          break;
-        case 33071:
-          result.baseTexture.wrapMode = WRAP_MODES.CLAMP;
-          break;
+  parseTextureInfo<T extends glTFTexture>(info: any): T {
+    const texture = <T>new Texture({ source: this._asset.textures[info.index].source })
+    texture.texCoord = info.texCoord
+    const transform = info.extensions?.KHR_texture_transform
+    if (transform) {
+      texture.transform = transform
+      if (transform.texCoord !== undefined) {
+        texture.texCoord = transform.texCoord
       }
     }
-    return result;
+    return texture
   }
 
-  findTextureSource(obj) {
+  /**
+   * Returns the texture used by the specified object.
+   * @param index The index of the texture in the JSON descriptor.
+   */
+  parseTexture(index: number) {
+    const texture = this._descriptor.textures[index]
+    const imageIndex = this.findTextureSource(texture)
+    if (imageIndex === undefined) {
+      throw new Error(`PIXI3D: Texture ${index} does not reference an image.`)
+    }
+    const image = this._asset.images[imageIndex]
+    const sampler = (this._descriptor.samplers && texture.sampler !== undefined)
+      ? this._descriptor.samplers[texture.sampler] : {}
+    // Each glTF texture pairs an image with its own sampler state, which in
+    // PixiJS v8 lives on the texture source (there is no per-texture style),
+    // so a new source is created over the already decoded image resource.
+    const { pixelWidth, pixelHeight } = image.source
+    const source = new ImageSource({
+      resource: image.source.resource,
+      // Went back and forth about NO_PREMULTIPLIED_ALPHA. The default in
+      // PixiJS is to have premultiplied alpha textures, but this may not work
+      // so well when rendering objects as opaque (which have alpha equal to 0).
+      // In that case it's impossible to retrieve the original RGB values,
+      // because they are all zero when using premultiplied alpha. Both the glTF
+      // Sample Viewer and Babylon.js uses NO_PREMULTIPLIED_ALPHA so decided to
+      // do the same.
+      alphaMode: "no-premultiply-alpha",
+      // The sampler's wrap mode along s applies to both axes, and filtering
+      // is PixiJS v7's default: linear, with mipmaps for power-of-two images.
+      // Pixi3D never applied a sampler's filters.
+      addressMode: samplerWrapMode(sampler.wrapS),
+      scaleMode: "linear",
+      autoGenerateMipmaps: isPowerOfTwo(pixelWidth) && isPowerOfTwo(pixelHeight),
+      label: texture.name,
+    })
+    return new Texture({ source })
+  }
+
+  findTextureSource(obj: any): number | undefined {
     // Base case: Check if the current object directly contains the `source` key
     if (obj && typeof obj === "object" && "source" in obj) {
-      return obj.source;
+      return obj.source
     }
 
     // Recursively check each key in the object
     for (const key in obj) {
       if (obj[key] && typeof obj[key] === "object") {
-        const result = this.findTextureSource(obj[key]);
+        const result = this.findTextureSource(obj[key])
         if (result !== undefined) {
-          return result;
+          return result
         }
       }
     }
-    return undefined;
+    return undefined
   }
 
   /**
@@ -275,8 +261,9 @@ export class glTFParser {
     }
     let weights = mesh.weights || []
     return <Mesh3D[]>mesh.primitives.map((primitive: any) => {
+      // `label` is v8's name for a container's name; `name` still reads it.
       return Object.assign<Mesh3D, Partial<Mesh3D>>(this.parsePrimitive(primitive), {
-        name: mesh.name,
+        label: mesh.name,
         targetWeights: weights
       })
     })
@@ -353,12 +340,12 @@ export class glTFParser {
         const inverseBindMatrices = this.parseBuffer(skin.inverseBindMatrices)
         const inverseBindMatrix = <Float32Array>inverseBindMatrices?.buffer.slice(i * 16, i * 16 + 16)
         joint = Object.assign<Joint, Partial<Joint>>(new Joint(inverseBindMatrix), {
-          name: node.name
+          label: node.name
         })
       }
     }
     let container = joint || Object.assign<Container3D, Partial<Container3D>>(new Container3D(), {
-      name: node.name
+      label: node.name
     })
     if (node.translation) {
       container.position.set(
@@ -395,8 +382,9 @@ export class glTFParser {
 
       if (mesh !== undefined) {
         for (let primitive of this.parseMesh(mesh)) {
-          model.meshes.push(nodes[node].addChild(primitive))
-          model.meshes[model.meshes.length - 1].skin = skin
+          primitive.skin = skin
+          nodes[node].addChild(primitive)
+          model.meshes.push(primitive)
         }
       }
       parent.addChild(nodes[node])
@@ -417,6 +405,25 @@ export class glTFParser {
     }
     return model
   }
+}
+
+// glTF sampler wrap modes (WebGL enum values) mapped onto PixiJS v8's
+// address modes.
+const GL_REPEAT = 10497
+const GL_CLAMP_TO_EDGE = 33071
+const GL_MIRRORED_REPEAT = 33648
+
+function samplerWrapMode(wrap?: number): WRAP_MODE {
+  switch (wrap) {
+    case GL_CLAMP_TO_EDGE: return "clamp-to-edge"
+    case GL_MIRRORED_REPEAT: return "mirror-repeat"
+    case GL_REPEAT:
+    default: return "repeat"
+  }
+}
+
+function isPowerOfTwo(value: number) {
+  return value > 0 && (value & (value - 1)) === 0
 }
 
 const componentCount: { [name: string]: number } = {

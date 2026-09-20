@@ -1,5 +1,4 @@
-import { Renderer } from "@pixi/core"
-import { settings } from "@pixi/settings"
+import { WebGLRenderer as Renderer } from "pixi.js"
 import { MeshGeometry3D } from "../../mesh/geometry/mesh-geometry"
 import { StandardMaterialAlphaMode } from "./standard-material-alpha-mode"
 import { StandardMaterialDebugMode } from "./standard-material-debug-mode"
@@ -11,6 +10,14 @@ import { StandardMaterialMatrixTexture } from "./standard-material-matrix-textur
 import { Debug } from "../../debug"
 import { Message } from "../../message"
 import { CubemapFormat } from "../../cubemap/cubemap-format"
+
+/**
+ * Prefer uploading skin joint matrices as uniforms (when they fit) rather
+ * than through a floating-point texture. Replaces the
+ * `settings.PREFER_UNIFORMS_WHEN_UPLOADING_SKIN_JOINTS` flag piggybacked on
+ * PixiJS's (now removed) global settings object.
+ */
+export let preferUniformsWhenUploadingSkinJoints = false
 
 export namespace StandardMaterialFeatureSet {
   export function build(renderer: Renderer, mesh: Mesh3D, geometry: MeshGeometry3D, material: StandardMaterial, lightingEnvironment: LightingEnvironment) {
@@ -211,8 +218,7 @@ export namespace StandardMaterialFeatureSet {
       features.push("USE_SKINNING_TEXTURE 1")
     }
 
-    // @ts-ignore Use PixiJS's already existing settings object for now.
-    if (settings.PREFER_UNIFORMS_WHEN_UPLOADING_SKIN_JOINTS) {
+    if (preferUniformsWhenUploadingSkinJoints) {
       if (uniformsSupported) {
         addFeatureSetForUniforms(); return
       }

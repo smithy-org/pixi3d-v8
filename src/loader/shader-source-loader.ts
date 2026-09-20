@@ -1,26 +1,29 @@
-import { Compatibility } from "../compatibility/compatibility"
-import { LoaderResourceResponseType } from "../compatibility/compatibility-version"
-import { settings } from "@pixi/settings"
+import { checkExtension, DOMAdapter, extensions, ExtensionType, LoaderParserPriority } from "pixi.js"
+import type { LoaderParser } from "pixi.js"
 
-const EXTENSIONS = ["glsl", "vert", "frag"]
+const EXTENSIONS = [".glsl", ".vert", ".frag"]
 
-export const ShaderSourceLoader = {
-  use: (resource: any, next: () => void) => {
-    next()
+/**
+ * Load parser for GLSL shader source files: `Assets.load("shader.frag")`
+ * resolves to the file contents as a string.
+ */
+export const ShaderSourceLoader: LoaderParser<string> = {
+  extension: {
+    type: ExtensionType.LoadParser,
+    priority: LoaderParserPriority.Normal,
+    name: "shader-source",
   },
-  add: function () {
-    for (let ext of EXTENSIONS) {
-      Compatibility.setLoaderResourceExtensionType(ext,
-        LoaderResourceResponseType.text)
-    }
-  },
-  test(url: string): boolean {
-    return url.includes(".glsl") || url.includes(".vert") || url.includes(".frag")
+  id: "shader-source",
+  // Deprecated in favour of `id`, but PixiJS 8.20 still validates parsers by
+  // name: two parsers without one are reported as a conflict.
+  name: "shader-source",
+  test(url: string) {
+    return checkExtension(url, EXTENSIONS)
   },
   async load(url: string): Promise<string> {
-    const response = await settings.ADAPTER.fetch(url)
-    return await response.text()
+    const response = await DOMAdapter.get().fetch(url)
+    return response.text()
   },
 }
 
-Compatibility.installLoaderPlugin("shader", ShaderSourceLoader)
+extensions.add(ShaderSourceLoader)

@@ -19,7 +19,10 @@ export default function glsl() {
   return {
     name: "glsl",
     load(id) {
-      if (id.includes(".vert") || id.includes(".frag")) {
+      // Only shader sources: PixiJS ships JavaScript modules named like
+      // `blend-template.frag.mjs`, which a bundle that includes it must
+      // leave alone.
+      if (/\.(vert|frag)$/.test(id)) {
         return template(load(id))
       }
       return null

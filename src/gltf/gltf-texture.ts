@@ -1,5 +1,4 @@
-import { Texture } from "@pixi/core"
-
+import { Texture } from "pixi.js"
 export interface glTFTexture extends Texture {
   texCoord?: number
   transform?: {

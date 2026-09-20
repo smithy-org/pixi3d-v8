@@ -1,4 +1,4 @@
-import { State, Renderer, Program } from "@pixi/core"
+import { State, GlProgram } from "pixi.js"
 import { Cubemap } from "../cubemap/cubemap"
 import { MeshShader } from "../mesh/mesh-shader"
 import { Camera } from "../camera/camera"
@@ -18,8 +18,8 @@ export class SkyboxMaterial extends Material {
   set cubemap(value: Cubemap) {
     if (value !== this._cubemap) {
       if (!this._cubemap.valid) {
-        // Remove the shader so it can be rebuilt with the current features. 
-        // It may happen that we set a texture which is not yet valid, in that 
+        // Remove the shader so it can be rebuilt with the current features.
+        // It may happen that we set a texture which is not yet valid, in that
         // case we don't want to render the skybox until it has become valid.
         this._shader = undefined
       }
@@ -34,6 +34,9 @@ export class SkyboxMaterial extends Material {
   constructor(cubemap: Cubemap) {
     super()
     this._cubemap = cubemap
+    // Writing to the depth buffer is disabled so all other objects end up
+    // in front of the skybox. The renderer's state system applies the depth
+    // mask, so no raw GL calls are needed around the draw.
     this.state = Object.assign(new State(), {
       culling: true, clockwiseFrontFace: true, depthTest: true, depthMask: false
     })
@@ -50,17 +53,9 @@ export class SkyboxMaterial extends Material {
     shader.uniforms.u_Exposure = this.exposure
   }
 
-  render(mesh: Mesh3D, renderer: Renderer) {
-    // Disable writing to the depth buffer. This is because we want all other 
-    // objects to be in-front of the skybox.
-    renderer.gl.depthMask(false)
-    super.render(mesh, renderer)
-    renderer.gl.depthMask(true)
-  }
-
   createShader() {
     if (this.cubemap.valid) {
-      return new MeshShader(Program.from(Vertex.source, Fragment.source))
+      return new MeshShader(GlProgram.from({ vertex: Vertex.source, fragment: Fragment.source }))
     }
   }
 }

@@ -1,42 +1,22 @@
 async function loadResources(urls) {
   let resources = {}
-  if (PIXI.Assets) {
-    for (let url of urls || []) {
-      let asset = await PIXI.Assets.load(url.url)
-      resources[url.name] = {
-        gltf: asset, texture: asset, cubemap: asset
-      }
+  for (let url of urls || []) {
+    let asset = await PIXI.Assets.load(url.url)
+    resources[url.name] = {
+      gltf: asset, texture: asset, cubemap: asset
     }
-    // Need some delay for embedded/binary glTF files, not sure why - needs
-    // some investigation.
-    await new Promise(resolve => setTimeout(resolve, 100))
-  } else {
-    let loader = new PIXI.Loader()
-    if (urls) {
-      urls.forEach(res => { loader.add(res) })
-    }
-    return new Promise((resolve, reject) => {
-      loader.load((_, resources) => {
-        resolve(resources)
-      })
-    })
   }
+  // Need some delay for embedded/binary glTF files, not sure why - needs
+  // some investigation.
+  await new Promise(resolve => setTimeout(resolve, 100))
   return resources
 }
 
-async function getObjectURLFromRender(render, urls, { width = 1280, height = 720, webGL = 1 } = {}) {
-  // switch (webGL) {
-  //   case 1: {
-  //     PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL1
-  //     break
-  //   }
-  //   case 2: {
-  //     PIXI.settings.PREFER_ENV = PIXI.ENV.WEBGL2
-  //     break
-  //   }
-  // }
-  let renderer = new PIXI.Renderer({
-    width, height, backgroundColor: 0xcccccc
+async function getObjectURLFromRender(render, urls, { width = 1280, height = 720 } = {}) {
+  // Pixi3D renders with WebGL only; the runner can ask for WebGL 1.
+  let renderer = await PIXI.autoDetectRenderer({
+    width, height, backgroundColor: 0xcccccc, preference: "webgl",
+    preferWebGLVersion: window.PIXI3D_TEST_WEBGL_VERSION || 2
   })
   let resources = await loadResources(urls)
   return new Promise(async (resolve, reject) => {
@@ -45,11 +25,10 @@ async function getObjectURLFromRender(render, urls, { width = 1280, height = 720
     canvas.width = width
     canvas.height = height
     let ctx = canvas.getContext("2d")
-    ctx.drawImage(renderer.view, 0, 0)
+    ctx.drawImage(renderer.canvas, 0, 0)
     canvas.toBlob(blob => {
       resolve(URL.createObjectURL(blob))
       renderer.destroy()
-      PIXI.utils.clearTextureCache()
     })
   })
 }

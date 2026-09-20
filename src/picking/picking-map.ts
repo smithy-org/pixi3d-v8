@@ -1,26 +1,36 @@
 import { PickingHitArea } from "./picking-hitarea"
 import { Mesh3D } from "../mesh/mesh"
 import { Camera } from "../camera/camera"
-import { RenderTexture, Renderer, Program } from "@pixi/core"
+import { RenderTexture, RenderTarget, WebGLRenderer, GlProgram, State, CLEAR } from "pixi.js"
 import { Mat4 } from "../math/mat4"
 import { MeshShader } from "../mesh/mesh-shader"
+import { getGlContext } from "../compatibility/gl-context"
 import { Shader as Vertex } from "./shader/picking.vert"
 import { Shader as Fragment } from "./shader/picking.frag"
 
 export class PickingMap {
   private _pixels: Uint8Array
   private _output: RenderTexture
+  private _target: RenderTarget
   private _shader: MeshShader
+  private _state = Object.assign(new State(), {
+    blend: false, culling: true, clockwiseFrontFace: false, depthTest: true, depthMask: true
+  })
   private _update = 0
 
-  constructor(private _renderer: Renderer, size: number) {
+  constructor(private _renderer: WebGLRenderer, size: number) {
     this._pixels = new Uint8Array(size * size * 4)
-    this._output = RenderTexture.create({ width: size, height: size, resolution: 1 })
-    this._shader = new MeshShader(Program.from(Vertex.source, Fragment.source))
-    this._output.framebuffer.addDepthTexture()
+    this._output = RenderTexture.create({
+      width: size, height: size, resolution: 1, scaleMode: "nearest", autoGenerateMipmaps: false
+    })
+    // The ids are drawn depth tested so the nearest object wins, which needs
+    // a depth buffer on the target (render textures have none by default).
+    this._target = new RenderTarget({ colorTextures: [this._output], depth: true })
+    this._shader = new MeshShader(GlProgram.from({ vertex: Vertex.source, fragment: Fragment.source }))
   }
 
   destroy() {
+    this._target.destroy()
     this._output.destroy(true)
     this._shader.destroy()
   }
@@ -48,19 +58,20 @@ export class PickingMap {
   }
 
   update(hitAreas: PickingHitArea[]) {
-    this._renderer.renderTexture.bind(this._output)
+    const renderTarget = this._renderer.renderTarget
     if (this._update++ % 2 === 0) {
-      // For performance reasons, the update method alternates between rendering 
+      // For performance reasons, the update method alternates between rendering
       // the meshes and reading the pixels from the rendered texture.
-      this._renderer.renderTexture.clear()
+      renderTarget.push({ target: this._target, clear: CLEAR.ALL, clearColor: [0, 0, 0, 0] })
       for (let hitArea of hitAreas) {
         this.renderHitArea(hitArea)
       }
     } else {
-      const gl = this._renderer.gl
+      renderTarget.push({ target: this._target, clear: false })
+      const gl = getGlContext(this._renderer)
       gl.readPixels(0, 0, this._output.width, this._output.height, gl.RGBA, gl.UNSIGNED_BYTE, this._pixels)
     }
-    this._renderer.renderTexture.bind(undefined)
+    renderTarget.pop()
   }
 
   private _matrix = new Float32Array(16)
@@ -73,7 +84,7 @@ export class PickingMap {
       uniforms.u_Id = hitArea.id
       uniforms.u_ModelViewProjection = Mat4.multiply(
         camera.viewProjection.array, mesh.transform.worldTransform.array, this._matrix)
-      this._shader.render(mesh, this._renderer)
+      this._shader.render(mesh, this._renderer, this._state)
     }
   }
 }

@@ -8,9 +8,16 @@ import fs from "fs/promises"
 import path from "path"
 import { fileURLToPath } from "url"
 
-const PIXI_VERSION = process.env.PIXI_VERSION || "6.5.5";
 const PORT = 3000
 const DIRNAME = path.dirname(fileURLToPath(import.meta.url))
+// The PixiJS the library is built and type-checked against (the dev
+// dependency), in its browser build.
+const PIXI_SCRIPT = path.join(DIRNAME, "../node_modules/pixi.js/dist/pixi.js")
+// When set, every render is also written to this directory, named after its
+// snapshot.
+const RENDER_OUT = process.env.RENDER_OUT
+// Set to 1 to render with WebGL 1 rather than WebGL 2.
+const WEBGL_VERSION = Number(process.env.WEBGL_VERSION) || 2
 
 use(function (chai) {
   chai.Assertion.addMethod("match", async function (expectedURL, { resources = [], threshold = 0.1, maxDiff = 50 } = {}) {
@@ -20,6 +27,10 @@ use(function (chai) {
     }))
     let actual = await getImageDataFromRender(this._obj, resources)
     let expected = await getImageDataFromSnapshot("test/" + expectedURL)
+    if (RENDER_OUT) {
+      await fs.mkdir(RENDER_OUT, { recursive: true })
+      await fs.writeFile(path.join(RENDER_OUT, path.basename(expectedURL)), PNG.sync.write(actual))
+    }
     const diff = pixelmatch(actual.data, expected.data,
       undefined, actual.width, actual.height, { threshold })
     if (diff > maxDiff) {
@@ -42,9 +53,10 @@ before(async function () {
 beforeEach(async function () {
   page = await browser.newPage()
 
-  await page.addScriptTag({ url: `https://pixijs.download/v${PIXI_VERSION}/pixi.js` })
-  await page.addScriptTag({ path: "./dist/browser/pixi3d.js" })
+  await page.addScriptTag({ path: PIXI_SCRIPT })
+  await page.addScriptTag({ path: path.join(DIRNAME, "../dist/browser/pixi3d.js") })
   await page.addScriptTag({ path: path.join(DIRNAME, "test-utils.js") })
+  await page.evaluate((version) => { window.PIXI3D_TEST_WEBGL_VERSION = version }, WEBGL_VERSION)
 })
 
 afterEach(async function () {
@@ -54,6 +66,12 @@ afterEach(async function () {
 after(async function () {
   server.close(); await browser.close()
 });
+
+/**
+ * Runs a function inside the test page, where PixiJS and Pixi3D are loaded,
+ * and returns its result; for tests that check values rather than pixels.
+ */
+globalThis.evaluateInPage = (fn, ...args) => page.evaluate(fn, ...args)
 
 async function getImageDataFromRender(render, resources) {
   let renderFuncString = render.toString()
@@ -97,6 +115,7 @@ import "./model-animation.test.mjs"
 import "./mesh.test.mjs"
 import "./camera.test.mjs"
 import "./camera-orbit-control.test.mjs"
-// import "./interaction.test.mjs"
+import "./interaction.test.mjs"
 import "./skybox.test.mjs"
 import "./gltf.test.mjs"
+import "./morph.test.mjs"

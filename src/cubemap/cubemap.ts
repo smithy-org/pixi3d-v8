@@ -1,16 +1,31 @@
-import { TARGETS, TYPES, FORMATS, ALPHA_MODES } from "@pixi/constants"
-import { BaseTexture, Texture } from "@pixi/core"
-import { MipmapResource } from "./mipmap-resource"
-import { CubemapResource, MipmapResourceArray } from "./cubemap-resource"
+import { Texture, TextureSource, BufferImageSource, Cache } from "pixi.js"
+import { CubemapResource, CubemapFaceSources } from "./cubemap-resource"
 import { Color } from "../color"
 import { CubemapFaces } from "./cubemap-faces"
-import { BufferResource } from "../compatibility/buffer-resource"
 import { CubemapFormat } from "./cubemap-format"
 
 /**
- * Cubemap which supports multiple user specified mipmaps.
+ * Resolves a face given as a texture or as the URL of an already loaded
+ * asset. PixiJS v8's `Texture.from` no longer loads from a URL, so a URL has
+ * to have gone through `Assets.load` first.
  */
-export class Cubemap extends BaseTexture<CubemapResource> {
+function toTextureSource(value: Texture | TextureSource | string, face: string): TextureSource {
+  if (typeof value === "string") {
+    const texture = Cache.has(value) ? Cache.get<Texture>(value) : undefined
+    if (!texture) {
+      throw new Error(`PIXI3D: The cubemap face "${face}" (${value}) has not been loaded, load it with Assets.load before creating the cubemap.`)
+    }
+    return texture.source
+  }
+  return value instanceof TextureSource ? value : value.source
+}
+
+/**
+ * Cubemap which supports multiple user specified mipmaps. It is a texture
+ * whose source is a cube (`CubemapResource`), so it can be assigned straight
+ * to a `samplerCube` uniform.
+ */
+export class Cubemap extends Texture<CubemapResource> {
 
   /** Returns an array of faces. */
   static get faces(): ["posx", "negx", "posy", "negy", "posz", "negz"] {
@@ -19,24 +34,54 @@ export class Cubemap extends BaseTexture<CubemapResource> {
 
   /** Returns the number of mipmap levels. */
   get levels() {
-    return this.resource.levels
+    return this.source.levels
   }
 
   /** The format for this cubemap. */
   cubemapFormat = CubemapFormat.ldr
 
   /**
-   * Creates a new cubemap from the specified faces.
-   * @param faces The faces to create the cubemap from.
+   * Value indicating if every face of every level has loaded and the cubemap
+   * can be used for rendering.
    */
-  static fromFaces(faces: CubemapFaces | CubemapFaces[]) {
-    const array = Array.isArray(faces) ? faces : [faces]
-    const resources = <MipmapResourceArray>Cubemap.faces.map((face, index) => {
-      return new MipmapResource(array.map(f => f[face]),
-        TARGETS.TEXTURE_CUBE_MAP_POSITIVE_X + index)
+  get valid() {
+    return this.source.valid
+  }
+
+  /**
+   * Creates a new cubemap from the specified resource.
+   * @param source The cube texture source.
+   */
+  constructor(source: CubemapResource) {
+    super({ source })
+  }
+
+  /**
+   * Creates a new cubemap from the specified faces. Passing an array creates
+   * one mip level per element, largest first.
+   * @param faces The faces to create the cubemap from.
+   * @param format The format of the cubemap.
+   */
+  static fromFaces(faces: CubemapFaces | CubemapFaces[], format = CubemapFormat.ldr) {
+    const mipmaps = (Array.isArray(faces) ? faces : [faces]).map(level => {
+      const sources = <CubemapFaceSources>{}
+      for (const face of Cubemap.faces) {
+        sources[face] = toTextureSource(level[face], face)
+      }
+      return sources
     })
-    return new Cubemap(
-      new CubemapResource(resources, array.length))
+    const cubemap = new Cubemap(new CubemapResource(mipmaps))
+    cubemap.cubemapFormat = format
+    return cubemap
+  }
+
+  /**
+   * Creates a new cubemap from the specified mip levels, largest first.
+   * @param mipmaps The faces for each mip level.
+   * @param format The format of the cubemap.
+   */
+  static fromMipmaps(mipmaps: CubemapFaces[], format = CubemapFormat.ldr) {
+    return Cubemap.fromFaces(mipmaps, format)
   }
 
   /**
@@ -49,21 +94,18 @@ export class Cubemap extends BaseTexture<CubemapResource> {
    * @param negz The color for negative z.
    */
   static fromColors(posx: Color, negx = posx, posy = posx, negy = posx, posz = posx, negz = posx) {
-    const resources: MipmapResource[] = []
-    const colors = [posx, negx, posy, negy, posz, negz]
-
-    for (let i = 0; i < colors.length; i++) {
-      let resource = new BufferResource(
-        new Uint8Array(colors[i].rgba.map(c => c * 255)), { width: 1, height: 1 })
-      let texture = new Texture(new BaseTexture(resource, {
-        type: TYPES.UNSIGNED_BYTE,
-        format: FORMATS.RGB,
-        alphaMode: ALPHA_MODES.NO_PREMULTIPLIED_ALPHA,
-      }))
-      resources.push(new MipmapResource([texture],
-        TARGETS.TEXTURE_CUBE_MAP_POSITIVE_X + i))
+    const colors = { posx, negx, posy, negy, posz, negz }
+    const sources = <CubemapFaceSources>{}
+    for (const face of Cubemap.faces) {
+      sources[face] = new BufferImageSource({
+        resource: Uint8Array.from(colors[face].rgba, c => Math.round(c * 255)),
+        width: 1,
+        height: 1,
+        format: "rgba8unorm",
+        alphaMode: "no-premultiply-alpha",
+        autoGenerateMipmaps: false,
+      })
     }
-    return new Cubemap(
-      new CubemapResource(<MipmapResourceArray>resources, 1))
+    return new Cubemap(new CubemapResource([sources]))
   }
 }

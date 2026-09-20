@@ -1,5 +1,6 @@
-import { ObservablePoint, IPoint } from "@pixi/math"
+import { ObservablePoint, Observer, Point, PointData } from "pixi.js"
 import { Quat } from "../math/quat"
+import { unusedObserver } from "./unused-observer"
 
 const temp = new Float32Array(4)
 
@@ -8,6 +9,12 @@ const temp = new Float32Array(4)
  */
 export class Quaternion extends ObservablePoint {
   private _array = new Float32Array(4)
+
+  /** The callback invoked when the quaternion changes. */
+  cb: () => void
+
+  /** The owner of the callback. */
+  scope: any
 
   /** Array containing the x, y, z, w values. */
   get array() {
@@ -28,7 +35,9 @@ export class Quaternion extends ObservablePoint {
    * @param scope The owner of callback.
    */
   constructor(x = 0, y = 0, z = 0, w = 1, cb: () => void = () => { }, scope: any = undefined) {
-    super(cb, scope)
+    super(unusedObserver)
+    this.cb = cb
+    this.scope = scope
     this._array.set([x, y, z, w])
   }
 
@@ -95,8 +104,20 @@ export class Quaternion extends ObservablePoint {
    * @param cb Callback when changed.
    * @param scope Owner of callback.
    */
-  clone(cb = this.cb, scope = this.scope) {
-    return new Quaternion(this.x, this.y, this.z, this.w, cb, scope)
+  clone(cb?: () => void, scope?: any): Quaternion
+  /**
+   * Creates a clone of this quaternion, notifying a PixiJS observer when
+   * changed.
+   * @param observer The observer to notify.
+   */
+  clone(observer?: Observer<ObservablePoint>): Quaternion
+  clone(cb: (() => void) | Observer<ObservablePoint> = this.cb, scope: any = this.scope) {
+    if (typeof cb === "function") {
+      return new Quaternion(this.x, this.y, this.z, this.w, cb, scope)
+    }
+    const quaternion: Quaternion = new Quaternion(
+      this.x, this.y, this.z, this.w, () => cb._onUpdate(quaternion))
+    return quaternion
   }
 
   /**
@@ -118,7 +139,7 @@ export class Quaternion extends ObservablePoint {
    * Copies x, y, z and w into the given quaternion.
    * @param p The quaternion to copy to.
    */
-  copyTo<T extends IPoint>(p: T) {
+  copyTo<T extends PointData>(p: T) {
     if (p instanceof Quaternion) {
       p.set(this.x, this.y, this.z, this.w)
     }
@@ -163,8 +184,25 @@ export class Quaternion extends ObservablePoint {
    * Normalize the quaternion.
    * @param out The receiving quaternion. If not supplied, a new quaternion will be created.
    */
-  normalize(out = new Quaternion()) {
-    return out.setFrom(Quat.normalize(this._array, temp))
+  normalize(out?: Quaternion): Quaternion
+  /**
+   * Normalize the quaternion into a 2D point, as `ObservablePoint.normalize`
+   * does: receives the x and y of the normalized quaternion.
+   * @param out The receiving point.
+   */
+  normalize<T extends PointData = Point>(out?: T): T
+  normalize(out: PointData = new Quaternion()) {
+    const normalized = Quat.normalize(this._array, temp)
+    if (out instanceof Quaternion) {
+      return out.setFrom(normalized)
+    }
+    out.x = normalized[0]
+    out.y = normalized[1]
+    return out
+  }
+
+  toString() {
+    return `[pixi3d:Quaternion x=${this.x} y=${this.y} z=${this.z} w=${this.w}]`
   }
 
   /**

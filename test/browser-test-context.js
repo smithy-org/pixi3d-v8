@@ -17,6 +17,9 @@ class HTMLMessageError extends Error {
   }
 }
 
+// Tests run in the page here, so a function meant for the page is just called.
+globalThis.evaluateInPage = async (fn, ...args) => fn(...args)
+
 use(function (chai) {
   chai.Assertion.addMethod("match", async function (expectedURL, { resources = [], threshold = 0.1, maxDiff = 50 } = {}) {
     resources = resources.map(res => ({ name: res, url: res }))
@@ -45,3 +48,4 @@ import "./camera-orbit-control.test.mjs"
 import "./interaction.test.mjs"
 import "./skybox.test.mjs"
 import "./gltf.test.mjs"
+import "./morph.test.mjs"

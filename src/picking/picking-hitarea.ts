@@ -1,4 +1,4 @@
-import { IHitArea } from "@pixi/interaction"
+import type { IHitArea } from "pixi.js"
 import { PickingInteraction } from "./picking-interaction"
 import { Mesh3D } from "../mesh/mesh"
 import { Model } from "../model"
@@ -7,9 +7,11 @@ import { Camera } from "../camera/camera"
 
 /**
  * Hit area which uses the shape of an object to determine interaction.
+ * Assign it to the `hitArea` of an object with `eventMode` set to "static"
+ * (or "dynamic") and listen for the usual pointer events on that object.
  */
 export class PickingHitArea implements IHitArea {
-  
+
   /** The id which maps to the object. */
   id = PickingId.next()
 

@@ -1,4 +1,4 @@
-import { Geometry } from "@pixi/core"
+import { Geometry } from "pixi.js"
 import { MeshShader } from "../mesh-shader"
 import { MeshGeometryAttribute } from "./mesh-geometry-attribute"
 import { MeshGeometryTarget } from "./mesh-geometry-target"
@@ -8,6 +8,7 @@ import { MeshGeometryTarget } from "./mesh-geometry-target"
  */
 export class MeshGeometry3D {
   private _shaderGeometry: { [id: string]: Geometry } = {}
+  private _shaderGeometryInstanced: { [id: string]: boolean } = {}
 
   indices?: MeshGeometryAttribute
   positions?: MeshGeometryAttribute
@@ -34,6 +35,7 @@ export class MeshGeometry3D {
    */
   addShaderGeometry(shader: MeshShader, instanced: boolean) {
     this._shaderGeometry[shader.name] = shader.createShaderGeometry(this, instanced)
+    this._shaderGeometryInstanced[shader.name] = instanced
   }
 
   /**
@@ -44,7 +46,7 @@ export class MeshGeometry3D {
    */
   hasShaderGeometry(shader: MeshShader, instanced: boolean) {
     if (this._shaderGeometry[shader.name]) {
-      return !instanced || (instanced && this._shaderGeometry[shader.name].instanced)
+      return !instanced || (instanced && this._shaderGeometryInstanced[shader.name])
     }
     return false
   }
@@ -57,5 +59,6 @@ export class MeshGeometry3D {
       this._shaderGeometry[name].destroy()
     }
     this._shaderGeometry = {}
+    this._shaderGeometryInstanced = {}
   }
 }

@@ -1,4 +1,4 @@
-import { Renderer, ObjectRenderer } from "@pixi/core"
+import { InstructionSet, Renderer, RenderLayer } from "pixi.js"
 import { PlaneGeometry } from "./geometry/plane-geometry"
 import { CubeGeometry } from "./geometry/cube-geometry"
 import { MeshGeometry3D } from "./geometry/mesh-geometry"
@@ -11,7 +11,7 @@ import { StandardMaterial } from "../material/standard/standard-material"
 import { MeshDestroyOptions } from "./mesh-destroy-options"
 import { Vec3 } from "../math/vec3"
 import { AABB } from "../math/aabb"
-import { CircleGeometry, CircleGeometryOptions  } from "./geometry/circle-geometry"
+import { CircleGeometry, CircleGeometryOptions } from "./geometry/circle-geometry"
 import { CylinderGeometry, CylinderGeometryOptions } from "./geometry/cylinder-geometry"
 import { SphereGeometry, SphereGeometryOptions } from "./geometry/sphere-geometry"
 
@@ -20,8 +20,20 @@ import { SphereGeometry, SphereGeometryOptions } from "./geometry/sphere-geometr
  */
 export class Mesh3D extends Container3D {
 
-  /** The name of the plugin used for rendering the mesh. */
-  pluginName = "pipeline"
+  /**
+   * The name of the render pipe used for rendering the mesh (the v8
+   * equivalent of a renderer plugin).
+   */
+  renderPipeId = "pipeline"
+
+  /** @deprecated Use `renderPipeId`. */
+  get pluginName() {
+    return this.renderPipeId
+  }
+
+  set pluginName(value: string) {
+    this.renderPipeId = value
+  }
 
   /** Array of weights used for morphing between geometry targets. */
   targetWeights?: number[]
@@ -121,14 +133,17 @@ export class Mesh3D extends Container3D {
     super.destroy(options)
   }
 
-  _render(renderer: Renderer) {
-    renderer.batch.setObjectRenderer(
-      <ObjectRenderer>(<any>renderer.plugins)[this.pluginName]
-    );
-    if (this.skin) {
-      this.skin.calculateJointMatrices()
+  /**
+   * Hands the mesh to its render pipe while the renderer builds its
+   * instruction set, then lets the children collect themselves as usual.
+   * @internal
+   */
+  collectRenderablesSimple(instructionSet: InstructionSet, renderer: Renderer, currentLayer: RenderLayer): void {
+    const pipe = (<any>renderer.renderPipes)[this.renderPipeId]
+    if (pipe?.addRenderable) {
+      pipe.addRenderable(this, instructionSet)
     }
-    <ObjectRenderer>(<any>renderer.plugins)[this.pluginName].render(this)
+    super.collectRenderablesSimple(instructionSet, renderer, currentLayer)
   }
 
   /**
@@ -141,6 +156,7 @@ export class Mesh3D extends Container3D {
     if (!this.geometry.positions?.max) {
       return undefined
     }
+    this.updateTransform3D()
     let min = Vec3.transformMat4(
       <any>this.geometry.positions.min, this.worldTransform.array)
     let max = Vec3.transformMat4(

@@ -4,34 +4,14 @@ import esbuild from "rollup-plugin-esbuild";
 import image from "@rollup/plugin-image"
 import resolve from '@rollup/plugin-node-resolve'
 import glsl from "./rollup-plugin-glsl"
-import jscc from "rollup-plugin-jscc"
 
-const packages = [
-  "@pixi/assets",
-  "@pixi/constants",
-  "@pixi/core",
-  "@pixi/display",
-  "@pixi/loaders",
-  "@pixi/math",
-  "@pixi/settings",
-  "@pixi/sprite",
-  "@pixi/ticker",
-  "@pixi/utils"
-]
-
-const globals = {}
-packages.forEach(function (key) {
-  globals[key] = key === "@pixi/utils" ? "PIXI.utils" : "PIXI"
-})
+// PixiJS v8 is one package; the browser build reads it from the `PIXI`
+// global of PixiJS' own browser build.
+const external = ["pixi.js"]
+const globals = { "pixi.js": "PIXI" }
 const banner = `/* Pixi3D v${pkg.version} */`
 
-const plugins = ({ compatibility = {}, minify = false } = {}) => [
-  jscc({
-    values: {
-      _PIXI_COMPATIBILITY_LOADERS: compatibility.loaders,
-      _PIXI_COMPATIBILITY_ASSETS: compatibility.assets,
-    }
-  }),
+const plugins = ({ minify = false } = {}) => [
   esbuild({
     target: "es2017",
     minify
@@ -44,7 +24,7 @@ const plugins = ({ compatibility = {}, minify = false } = {}) => [
 const config = (file, format, options) => {
   return {
     input: "src/index.ts",
-    external: packages,
+    external,
     plugins: plugins(options),
     output: [{
       file: file,
@@ -65,34 +45,7 @@ const format = (path, format, options = {}) => {
 }
 
 export default [
-  ...format("dist/browser/", "iife", {
-    compatibility: {
-      loaders: true,
-      assets: true
-    }
-  }),
-  ...format("dist/cjs/pixi5/", "cjs", {
-    compatibility: {
-      loaders: true,
-      assets: false
-    }
-  }),
-  ...format("dist/cjs/pixi7/", "cjs", {
-    compatibility: {
-      loaders: false,
-      assets: true
-    }
-  }),
-  ...format("dist/esm/pixi5/", "esm", {
-    compatibility: {
-      loaders: true,
-      assets: false
-    }
-  }),
-  ...format("dist/esm/pixi7/", "esm", {
-    compatibility: {
-      loaders: false,
-      assets: true
-    }
-  })
+  ...format("dist/browser/", "iife"),
+  ...format("dist/cjs/", "cjs"),
+  ...format("dist/esm/", "esm"),
 ]

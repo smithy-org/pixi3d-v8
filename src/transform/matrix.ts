@@ -1,4 +1,4 @@
-import { Matrix } from "@pixi/math"
+import { Matrix } from "pixi.js"
 import { Point3D } from "./point"
 import { Quaternion } from "./quaternion"
 import { Mat4 } from "../math/mat4"
@@ -7,7 +7,7 @@ import { MatrixComponent } from "./matrix-component"
 import { Quat } from "../math/quat"
 import { TransformId } from "./transform-id"
 
-const temp = new Float32Array(16)
+const temp: Float32Array = new Float32Array(16)
 
 /**
  * Represents a 4x4 matrix.
@@ -75,7 +75,7 @@ export class Matrix4x4 extends Matrix implements TransformId {
   /** Returns the normalized rotation quaternion of the matrix. */
   get rotation() {
     if (!this._rotation) {
-      let matrix = new Float32Array(16)
+      let matrix: Float32Array = new Float32Array(16)
       this._rotation = new MatrixComponent<Quaternion>(this, new Quaternion(), data => {
         // To extract a correct rotation, the scaling component must be eliminated.
         for (let col = 0; col < 3; col++) {

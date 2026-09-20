@@ -23,7 +23,7 @@ describe("Custom material", () => {
           shader.uniforms.u_Color = [255, 0, 255]
         }
         createShader() {
-          return new PIXI3D.MeshShader(PIXI.Program.from(vert, frag))
+          return new PIXI3D.MeshShader(PIXI.GlProgram.from({ vertex: vert, fragment: frag }))
         }
       }
       let model = PIXI3D.Model.from(resources["assets/teapot/teapot.gltf"].gltf, {

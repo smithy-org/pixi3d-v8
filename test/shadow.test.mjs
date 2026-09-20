@@ -28,7 +28,7 @@ describe("Shadow", () => {
       shadowCastingLight.softness = 1
       shadowCastingLight.shadowArea = 15
 
-      let pipeline = renderer.plugins.pipeline
+      let pipeline = renderer.renderPipes.pipeline
       pipeline.enableShadows(model, shadowCastingLight)
       pipeline.enableShadows(ground, shadowCastingLight)
 
@@ -71,7 +71,7 @@ describe("Shadow", () => {
       shadowCastingLight.softness = 1
       shadowCastingLight.shadowArea = 15
 
-      let pipeline = renderer.plugins.pipeline
+      let pipeline = renderer.renderPipes.pipeline
       pipeline.enableShadows(model, shadowCastingLight)
       pipeline.enableShadows(ground, shadowCastingLight)
 
@@ -112,7 +112,7 @@ describe("Shadow", () => {
       shadowCastingLight.softness = 1
       shadowCastingLight.shadowArea = 15
 
-      let pipeline = renderer.plugins.pipeline
+      let pipeline = renderer.renderPipes.pipeline
       pipeline.enableShadows(model, shadowCastingLight)
       pipeline.enableShadows(ground, shadowCastingLight)
 

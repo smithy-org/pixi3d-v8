@@ -1,15 +1,18 @@
-import { Buffer, Geometry } from "@pixi/core"
-import { InstancedMesh3D } from ".."
+import { Buffer, BufferUsage, Geometry } from "pixi.js"
+import { InstancedMesh3D } from "../mesh/instanced-mesh"
+
+const createBuffer = (size: number) => new Buffer({
+  data: new Float32Array(size), usage: BufferUsage.VERTEX | BufferUsage.COPY_DST
+})
 
 export class ShadowShaderInstancing {
   private _maxInstances = 20
 
-  private _modelMatrix: Buffer[] = [
-    new Buffer(), new Buffer(), new Buffer(), new Buffer()
-  ]
+  private _modelMatrix: Buffer[]
 
   constructor() {
-    this.expandBuffers(this._maxInstances)
+    const size = 4 * this._maxInstances
+    this._modelMatrix = [createBuffer(size), createBuffer(size), createBuffer(size), createBuffer(size)]
   }
 
   expandBuffers(instanceCount: number) {
@@ -17,7 +20,7 @@ export class ShadowShaderInstancing {
       this._maxInstances += Math.floor(this._maxInstances * 0.5)
     }
     for (let i = 0; i < 4; i++) {
-      this._modelMatrix[i].update(new Float32Array(4 * this._maxInstances))
+      this._modelMatrix[i].data = new Float32Array(4 * this._maxInstances)
     }
   }
 
@@ -26,6 +29,7 @@ export class ShadowShaderInstancing {
       this.expandBuffers(instances.length)
     }
     for (let i = 0; i < instances.length; i++) {
+      instances[i].updateTransform3D()
       const model = instances[i].worldTransform.array
       for (let j = 0; j < 4; j++) {
         (<Float32Array>this._modelMatrix[j].data)
@@ -40,8 +44,9 @@ export class ShadowShaderInstancing {
 
   addGeometryAttributes(geometry: Geometry) {
     for (let i = 0; i < 4; i++) {
-      geometry.addAttribute(`a_ModelMatrix${i}`,
-        this._modelMatrix[i], 4, false, undefined, 0, undefined, true)
+      geometry.addAttribute(`a_ModelMatrix${i}`, {
+        buffer: this._modelMatrix[i], format: "float32x4", instance: true
+      })
     }
   }
 }

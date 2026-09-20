@@ -1,7 +1,4 @@
-import { RenderTexture, Renderer } from "@pixi/core"
-import { DisplayObject, IDestroyOptions } from "@pixi/display"
-import { Sprite } from "@pixi/sprite"
-import { Ticker } from "@pixi/ticker"
+import { RenderTexture, RenderTarget, Renderer, Container, DestroyOptions, Sprite, Ticker, TextureSource } from "pixi.js"
 import { Compatibility } from "../compatibility/compatibility"
 import { CompositeSpriteOptions } from "./composite-sprite-options"
 
@@ -11,7 +8,9 @@ import { CompositeSpriteOptions } from "./composite-sprite-options"
  */
 export class CompositeSprite extends Sprite {
   private _tickerRender = () => { }
+  private _prerender?: { prerender: () => void }
   private _renderTexture: RenderTexture
+  private _renderTarget: RenderTarget
 
   /** The render texture. */
   get renderTexture() {
@@ -31,24 +30,32 @@ export class CompositeSprite extends Sprite {
       width = 512, height = 512, objectToRender, resolution = 1
     } = options || {}
 
-    this._renderTexture = RenderTexture.create({ width, height, resolution })
     /* When rendering to a texture, it's flipped vertically for some reason.
     This will flip it back to it's expected orientation. */
-    this._renderTexture.rotate = 8
-    this._renderTexture.baseTexture.framebuffer.depth = true
-    this._texture = this._renderTexture
+    this._renderTexture = new RenderTexture({
+      source: new TextureSource({ width, height, resolution }), rotate: 8
+    })
+    // Rendering goes through a render target with a depth buffer, so the
+    // object's meshes are depth tested against each other.
+    this._renderTarget = new RenderTarget({
+      colorTextures: [this._renderTexture], depth: true
+    })
+    this.texture = this._renderTexture
 
     if (!options || !options.width || !options.height) {
-      renderer.on("prerender", () => {
-        this._renderTexture.resize(renderer.screen.width, renderer.screen.height)
-      })
+      this._prerender = {
+        prerender: () => {
+          this._renderTexture.resize(renderer.screen.width, renderer.screen.height)
+        }
+      }
+      renderer.runners.prerender.add(this._prerender)
     }
     if (objectToRender) {
       this._tickerRender = () => {
         if (Compatibility.isRendererDestroyed(renderer)) {
           Ticker.shared.remove(this._tickerRender); return
         }
-        if (this.worldVisible && this.worldAlpha > 0 && this.renderable) {
+        if (this.isDisplayed()) {
           objectToRender && this.renderObject(objectToRender)
         }
       }
@@ -61,20 +68,40 @@ export class CompositeSprite extends Sprite {
    * @param resolution The resolution to set.
    */
   setResolution(resolution: number) {
-    this._renderTexture.setResolution(resolution)
     this._renderTexture.resize(
-      this._renderTexture.width, this._renderTexture.height, true)
+      this._renderTexture.width, this._renderTexture.height, resolution)
   }
 
-  destroy(options?: boolean | IDestroyOptions) {
-    Ticker.shared.remove(this._tickerRender); super.destroy(options)
+  destroy(options?: DestroyOptions) {
+    Ticker.shared.remove(this._tickerRender)
+    if (this._prerender && !Compatibility.isRendererDestroyed(this.renderer)) {
+      this.renderer.runners.prerender.remove(this._prerender)
+    }
+    this._renderTarget.destroy()
+    super.destroy(options)
   }
 
   /**
    * Updates the sprite's texture by rendering the specified object to it.
    * @param object The object to render.
    */
-  renderObject(object: DisplayObject) {
-    Compatibility.render(this.renderer, object, this.renderTexture)
+  renderObject(object: Container) {
+    this.renderer.render({ container: object, target: this._renderTarget })
+  }
+
+  /**
+   * Returns a value indicating if the sprite would be seen: it and all its
+   * ancestors are visible, it is renderable, and its alpha (with theirs) is
+   * above zero.
+   */
+  private isDisplayed() {
+    let alpha = 1
+    for (let object: Container | null = this; object; object = object.parent) {
+      if (!object.visible) {
+        return false
+      }
+      alpha *= object.alpha
+    }
+    return this.renderable && alpha > 0
   }
 }

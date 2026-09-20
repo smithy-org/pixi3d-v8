@@ -26,7 +26,7 @@ export abstract class glTFChannelFactory {
         glTFInterpolationFactory.create(interpolation, input, output, 4))
     }
     if (path === "weights") {
-      let weights = (<Mesh3D>target.children[0]).targetWeights
+      let weights = (<Mesh3D><unknown>target.children[0]).targetWeights
       if (!weights) {
         return undefined
       }

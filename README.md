@@ -1,4 +1,6 @@
 # Pixi3D
+> **Use this software at your own risk.** This is an unofficial fork that ports Pixi3D to PixiJS v8. It is only intended as a patch for a personal project: it comes as is, with no warranty and no support, and it is not affiliated with or endorsed by the original Pixi3D project, which lives at https://github.com/jnsmalm/pixi3d. The port is an alpha; see [PORT_STATUS.md](PORT_STATUS.md).
+
 Pixi3D is a 3D rendering library for the web. It's built on top of PixiJS (which is at it's core, an established 2D rendering library). This makes Pixi3D have seamless integration with already existing 2D applications.
 
 * Load models from file (glTF) or create procedural generated meshes
@@ -6,69 +8,69 @@ Pixi3D is a 3D rendering library for the web. It's built on top of PixiJS (which
 * Customized materials and shaders
 * 3D sprites
 * Transformation, morphing and skeletal animations
-* Compatible with PixiJS v5, v6 and v7.
+* This fork: compatible with PixiJS v8, from 8.20 on. For PixiJS v5, v6 and v7, use upstream Pixi3D 2.5. Coming from Pixi3D 2.5? [MIGRATION_V8.md](MIGRATION_V8.md) lists what changed.
 
 ![SPY-HYPERSPORT](https://github.com/jnsmalm/pixi3d/blob/develop/spy-hypersport.jpg?raw=true)
 
 *"SPY-HYPERSPORT" (https://skfb.ly/o8z7t) by Amvall is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/). Rendered using Pixi3D.*
 
 ## Production ready?
-Yes, it's currently being used in multiple projects in production running on hundreds of thousands of different devices (both desktop and mobile).
+Upstream Pixi3D is: it's currently being used in multiple projects in production running on hundreds of thousands of different devices (both desktop and mobile). This fork's PixiJS v8 port is an alpha. It passes upstream's snapshot test suite on PixiJS 8.20, on WebGL 2 and WebGL 1, but it has not been used in production.
 
 ## Getting started
-The easiest way to get started is to use the automatic setup which creates a simple project with everything needed to start immediatly. Node.js must be installed, go to https://nodejs.org to download.
+This fork needs PixiJS 8.20 or later, and renders with WebGL (not WebGPU). Coming from Pixi3D 2.5, see [MIGRATION_V8.md](MIGRATION_V8.md).
 
-Type in the following using the terminal/console:
+### Using npm
+The fork is not published to npm; install a tagged release from GitHub, next to PixiJS:
 
 ```
-npx create-pixi3d-app@latest my-pixi3d-app
+npm install pixi.js@^8.20.0 github:pjderouen/pixi3d#v3.0.0-alpha.2
 ```
-After installation is complete, type `cd my-pixi3d-app` and `npm start` to start local web server.
 
-### Manual setup
-
-- [Download the latest version of Pixi3D](https://github.com/jnsmalm/pixi3d/releases)
-- [Download PixiJS](https://github.com/pixijs/pixi.js/releases) (Pixi3D is compatible with all versions from 5.3 and later)
-
-Next, create a file *app.js* with the following contents.
+Then import from *pixi3d*, i.e. `import { Model } from "pixi3d"`. A rotating, lit cube:
 
 ```javascript
-let app = new PIXI.Application({
-  backgroundColor: 0xdddddd, resizeTo: window, antialias: true
+import { Application } from "pixi.js"
+import { Light, LightingEnvironment, Mesh3D } from "pixi3d"
+
+const app = new Application()
+await app.init({
+  preference: "webgl", backgroundColor: 0xdddddd, resizeTo: window, antialias: true
 })
-document.body.appendChild(app.view)
+document.body.appendChild(app.canvas)
 
-let mesh = app.stage.addChild(PIXI3D.Mesh3D.createCube())
+const mesh = app.stage.addChild(Mesh3D.createCube())
 
-let light = new PIXI3D.Light()
+const light = new Light()
 light.position.set(-1, 0, 3)
-PIXI3D.LightingEnvironment.main.lights.push(light)
+LightingEnvironment.main.lights.push(light)
 
 let rotation = 0
 app.ticker.add(() => {
   mesh.rotationQuaternion.setEulerAngles(0, rotation++, 0)
 })
 ```
-Then create *index.html* and include the required scripts.
+
+Import Pixi3D before the application is initialised: PixiJS v8 sets up a renderer's extensions, Pixi3D's among them, when it is created.
+
+### Script tags
+Each tagged release includes the browser build, which reads PixiJS from the `PIXI` global and provides `PIXI3D`:
 
 ```html
 <!doctype html>
 <html lang="en">
 <body>
-  <script type="text/javascript" src="pixi.js"></script>
-  <script type="text/javascript" src="pixi3d.js"></script>
-  <script type="text/javascript" src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pixi.js@8.20.1/dist/pixi.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/pjderouen/pixi3d@v3.0.0-alpha.2/dist/browser/pixi3d.min.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
 ```
 
-### Using npm
-Pixi3D is also available as a npm package. Install the latest release with `npm install pixi3d`. This requires that an up-to-date version of Node.js is already installed.
-
-If PixiJS v5 or v6 is used, import from *pixi3d* i.e. `import { Model } from "pixi3d"`. If PixiJS v7 is used, instead import from *pixi3d/pixi7* i.e. `import { Model } from "pixi3d/pixi7"`.
+with *app.js* as above, using `PIXI.Application` and `PIXI3D.Mesh3D` in place of the imports.
 
 ## Examples
-Examples are available as sandboxes at https://codesandbox.io to quickly get started. Download repo at https://github.com/jnsmalm/pixi3d-sandbox to instead run them locally.
+Upstream's examples are available as sandboxes at https://codesandbox.io, and at https://github.com/jnsmalm/pixi3d-sandbox to run them locally. They are written for Pixi3D 2.5 on PixiJS v5 to v7; with this fork, adapt them as [MIGRATION_V8.md](MIGRATION_V8.md) describes.
 
 | Example           | Description                                                             | Sandbox |
 |-------------------|-------------------------------------------------------------------------|:-------:|
@@ -83,16 +85,17 @@ Examples are available as sandboxes at https://codesandbox.io to quickly get sta
 | Post processing | Post processing sprite with filters | [View](https://codesandbox.io/s/github/jnsmalm/pixi3d-sandbox/tree/master/post-processing-sprite) |
 
 ## Quick guide
-An introduction to Pixi3D and a overview of the core concepts and components. Go to the [Quick guide sandbox](https://codesandbox.io/s/github/jnsmalm/pixi3d-sandbox/tree/master/quick-guide) to view a real-time demo of the scene created with this guide.
+An introduction to Pixi3D and a overview of the core concepts and components, updated for PixiJS v8. Upstream's [Quick guide sandbox](https://codesandbox.io/s/github/jnsmalm/pixi3d-sandbox/tree/master/quick-guide) shows the scene created with this guide, on PixiJS v7.
 
 ### Creating an application
-The quickest way to get started is by creating an PixiJS application object. The application object creates a renderer and automatically starts the render loop. It also creates a canvas element which should be added to the HTML document.
+The quickest way to get started is by creating an PixiJS application object. The application object creates a renderer and automatically starts the render loop. It also creates a canvas element which should be added to the HTML document. Pixi3D renders with WebGL, so the application is asked for it.
 
 ```javascript
-let app = new PIXI.Application({
-  resizeTo: window, backgroundColor: 0xdddddd, antialias: true
+let app = new PIXI.Application();
+await app.init({
+  preference: "webgl", resizeTo: window, backgroundColor: 0xdddddd, antialias: true
 });
-document.body.appendChild(app.view);
+document.body.appendChild(app.canvas);
 ```
 *Creates an application and adds the canvas element which results in an empty 
 page with a grey background.*
@@ -100,35 +103,11 @@ page with a grey background.*
 ### Loading a 3D model
 A model includes a hierarchy of 3D objects which are called meshes. A mesh contains the geometry and material used for rendering that object. Models are generally being loaded from a file which has been created in a 3D modeling tool like Maya or Blender. Pixi3D supports loading of models using the glTF 2.0 file format. Learn more about glTF at https://www.khronos.org/gltf/
 
-Loading a model is different depending on the PixiJS version used. This is how to do it when using PixiJS v5 or v6.
+Models load through PixiJS' `Assets`, like any other asset (`.gltf` and `.glb`).
 
 ```javascript
-app.loader.add(
-  "teapot.gltf",
-  "https://raw.githubusercontent.com/jnsmalm/pixi3d-sandbox/master/assets/teapot/teapot.gltf"
-);
-
-app.loader.load((_, resources) => {
-  setup(resources["teapot.gltf"].gltf);
-})
-
-function setup(gltf) {
-  let teapot = app.stage.addChild(PIXI3D.Model.from(gltf));
-}
-```
-
-This is how to do it when using PixiJS v7.
-
-```javascript
-// Using a self executing function just to make the different methods more comparable.
-(async function load() {
-  let gltf = await PIXI.Assets.load("https://raw.githubusercontent.com/jnsmalm/pixi3d-sandbox/master/assets/teapot/teapot.gltf")
-  setup(gltf)
-})()
-
-function setup(gltf) {
-  let teapot = app.stage.addChild(PIXI3D.Model.from(gltf));
-}
+let gltf = await PIXI.Assets.load("https://raw.githubusercontent.com/jnsmalm/pixi3d-sandbox/master/assets/teapot/teapot.gltf");
+let teapot = app.stage.addChild(PIXI3D.Model.from(gltf));
 ```
 *Loads a glTF 2.0 file and creates a model. The silhouette of a teapot should appear. For now, it will be rendered black because there is no lighting.*
 
@@ -205,7 +184,7 @@ let shadowCastingLight = new PIXI3D.ShadowCastingLight(app.renderer, dirLight, {
 shadowCastingLight.softness = 1;
 shadowCastingLight.shadowArea = 8;
 
-let pipeline = app.renderer.plugins.pipeline;
+let pipeline = app.renderer.renderPipes.pipeline;
 pipeline.enableShadows(teapot, shadowCastingLight);
 pipeline.enableShadows(ground, shadowCastingLight);
 ```
@@ -220,9 +199,9 @@ Another way of combining 2D and 3D objects is to render a 3D object as a sprite 
 
 ```javascript
 let vignette = app.stage.addChild(
-  PIXI.Sprite.from(
+  new PIXI.Sprite(await PIXI.Assets.load(
     "https://raw.githubusercontent.com/jnsmalm/pixi3d-sandbox/master/assets/vignette.png"
-  )
+  ))
 );
 
 app.ticker.add(() => {
@@ -237,21 +216,21 @@ app.ticker.add(() => {
 The camera is used for controlling from which position and direction the 3D scene is rendered, it has a position and rotation which is used for changing the view. Like any other object which has a transform, it can be attached to another object. The camera can also be directly controlled by using a mouse or trackpad. The main camera is created and used by default.
 
 ```javascript
-let control = new PIXI3D.CameraOrbitControl(app.view)
+let control = new PIXI3D.CameraOrbitControl(app.canvas)
 ```
 *Gives the user orbit control over the main camera using mouse/trackpad. Hold left mouse button and drag to orbit, use scroll wheel to zoom in/out.*
 
 ## API
-The API documentation is available at https://api.pixi3d.org
+Upstream's API documentation, for Pixi3D 2.5, is at https://api.pixi3d.org. [MIGRATION_V8.md](MIGRATION_V8.md) lists everything this fork changes, and the type declarations in *types* describe its API.
 
 ## Changelog
 All notable changes to this project will be documented in the [changelog](CHANGELOG.md)
 
 ## Development
-For developing new features or fixing bugs, use *serve/src/index.js* with `npm start`.
+The render harness, *serve/src/index.ts*, runs with `npm start` and serves http://127.0.0.1:8080; see [PORT_STATUS.md](PORT_STATUS.md) for its scenes.
 
 ## Tests
-Automatic tests can run both using Puppeteer (Headless Chrome) and on a specific device/browser. Run command `npm test` to execute tests using Puppeteer or start local web server with `npm run test:browser` and go to http://localhost:8080/. Before running tests, build using `npm run build`.
+Automatic tests can run both using Puppeteer (Headless Chrome) and on a specific device/browser. Run command `npm test` to build and execute tests using Puppeteer (set `WEBGL_VERSION=1` to test WebGL 1), or start local web server with `npm run test:browser` and go to http://localhost:8080/.
 
 ## Building
-Build to *dist* folder with `npm run build`.
+Build to *dist* folder with `npm run build`, and the type declarations to *types* with `npm run types`.

@@ -3,3 +3,4 @@
 /out
 /node_modules
 bundle.js
+serve/bundle.js.map

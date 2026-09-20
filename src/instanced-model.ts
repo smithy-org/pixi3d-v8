@@ -7,12 +7,14 @@ function clone(node: Container3D, parent: Container3D, meshes: InstancedMesh3D[]
   for (let child of node.children) {
     if (child instanceof Mesh3D) {
       const mesh = child.createInstance()
-      mesh.name = child.name
-      meshes.push(parent.addChild(mesh))
+      mesh.label = child.label
+      parent.addChild(mesh)
+      meshes.push(mesh)
     }
     else if (child instanceof Container3D) {
-      const copy = parent.addChild(new Container3D())
-      copy.name = node.name
+      const copy = new Container3D()
+      parent.addChild(copy)
+      copy.label = node.label
       copy.position = child.position
       copy.scale = child.scale
       copy.rotationQuaternion = child.rotationQuaternion

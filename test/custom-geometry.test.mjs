@@ -33,7 +33,7 @@ describe("Custom geometry", () => {
           shader.uniforms.u_ViewProjection = PIXI3D.Camera.main.viewProjection.array
         }
         createShader() {
-          return new CustomShader(PIXI.Program.from(vert, frag))
+          return new CustomShader(PIXI.GlProgram.from({ vertex: vert, fragment: frag }))
         }
       }
       let geometry = Object.assign(new PIXI3D.MeshGeometry3D(), {

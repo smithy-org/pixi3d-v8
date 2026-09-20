@@ -1,5 +1,4 @@
-import { State, Renderer } from "@pixi/core"
-import { BLEND_MODES } from "@pixi/constants"
+import { State, WebGLRenderer } from "pixi.js"
 import { ShadowShader } from "./shadow-shader"
 import { Mesh3D } from "../mesh/mesh"
 import { ShadowCastingLight } from "./shadow-casting-light"
@@ -10,14 +9,14 @@ import { Message } from "../message"
 
 export class ShadowRenderer {
   private _state = Object.assign(new State(), {
-    depthTest: true, clockwiseFrontFace: false, culling: true, blendMode: BLEND_MODES.NONE
+    depthTest: true, clockwiseFrontFace: false, culling: true, blend: false, blendMode: "none"
   })
   private _shadowShader: ShadowShader
   private _instancedShadowShader: ShadowShader
   private _skinningShader?: SkinningShader
   private _textureShader?: TextureShader
 
-  constructor(public renderer: Renderer) {
+  constructor(public renderer: WebGLRenderer) {
     this._shadowShader = new ShadowShader(this.renderer)
     this._instancedShadowShader = new ShadowShader(this.renderer, ["USE_INSTANCING 1"])
   }
@@ -36,8 +35,8 @@ export class ShadowRenderer {
   }
 
   render(mesh: Mesh3D, shadowCastingLight: ShadowCastingLight) {
-    const useInstances = mesh.instances.length > 0;
-    let shader: ShadowShader | undefined = useInstances ? this._instancedShadowShader : this._shadowShader;
+    const useInstances = mesh.instances.length > 0
+    let shader: ShadowShader | undefined = useInstances ? this._instancedShadowShader : this._shadowShader
     if (mesh.skin) {
       let skinningShader = this.getSkinningShader()
       if (skinningShader && mesh.skin.joints.length > skinningShader.maxSupportedJoints) {

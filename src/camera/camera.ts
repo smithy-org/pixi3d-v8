@@ -1,6 +1,4 @@
-import { IPointData, Point, ObservablePoint, DEG_TO_RAD } from "@pixi/math"
-import { Renderer } from "@pixi/core"
-import { IDestroyOptions } from "@pixi/display"
+import { PointData, Point, ObservablePoint, DEG_TO_RAD, Renderer, DestroyOptions } from "pixi.js"
 import { Container3D } from "../container"
 import { Mat4 } from "../math/mat4"
 import { Ray } from "../math/ray"
@@ -21,8 +19,24 @@ const vec4 = new Float32Array(4)
  */
 export class Camera extends Container3D implements TransformId {
   private _transformId = 0
+  private _rendererAspect = 0
 
+  /**
+   * The id every derived matrix is cached against. Reading it also makes
+   * sure the camera's own transform is current (a camera is usually not
+   * part of the stage hierarchy, so nothing else updates it) and that the
+   * projection follows the renderer's aspect ratio when no explicit aspect
+   * is set.
+   */
   get transformId() {
+    this.updateTransform3D()
+    if (!this._aspect) {
+      const aspect = this.renderer.width / this.renderer.height
+      if (aspect !== this._rendererAspect) {
+        this._rendererAspect = aspect
+        this._transformId++
+      }
+    }
     return this.transform._worldID + this._transformId
   }
 
@@ -31,9 +45,9 @@ export class Camera extends Container3D implements TransformId {
   private _viewProjection?: MatrixComponent<Matrix4x4>
   private _orthographic = false
   private _orthographicSize = 10
-  private _obliqueness = new ObservablePoint(() => {
-    this._transformId++
-  }, undefined)
+  private _obliqueness = new ObservablePoint({
+    _onUpdate: () => { this._transformId++ }
+  })
 
   /**
    * Used for making the frustum oblique, which means that one side is at a
@@ -44,12 +58,14 @@ export class Camera extends Container3D implements TransformId {
     return this._obliqueness
   }
 
-  set obliqueness(value: IPointData) {
+  set obliqueness(value: PointData) {
     this._obliqueness.copyFrom(value)
   }
 
   /** Main camera which is used by default. */
   static main: Camera
+
+  private _prerender = { prerender: () => this.updateTransform3D() }
 
   /**
    * Creates a new camera using the specified renderer. By default the camera
@@ -58,29 +74,10 @@ export class Camera extends Container3D implements TransformId {
    */
   constructor(public renderer: Renderer) {
     super()
-
-    let aspect = renderer.width / renderer.height
-    let localID = -1
-
-    this.renderer.on("prerender", () => {
-      if (!this._aspect) {
-        // When there is no specific aspect set, this is used for the 
-        // projection matrix to always update each frame (in case when the 
-        // renderer aspect ratio has changed).
-        if (renderer.width / renderer.height !== aspect) {
-          this._transformId++
-          aspect = renderer.width / renderer.height
-        }
-      }
-      // @ts-ignore: _localID do exist, but be careful if this changes.
-      if (!this.parent && localID !== this.transform._localID) {
-        // When the camera is not attached to the scene hierarchy the transform 
-        // needs to be updated manually.
-        this.transform.updateTransform()
-        // @ts-ignore: _localID do exist, but be careful if this changes.
-        localID = this.transform._localID
-      }
-    })
+    // The camera's transform is updated before every render, as it is when
+    // any of its matrices are read: the shadow pass reads its world
+    // transform directly.
+    renderer.runners.prerender.add(this._prerender)
     if (!Camera.main) {
       Camera.main = this
     }
@@ -88,7 +85,8 @@ export class Camera extends Container3D implements TransformId {
     this.transform.rotationQuaternion.setEulerAngles(0, 180, 0)
   }
 
-  destroy(options?: boolean | IDestroyOptions) {
+  destroy(options?: DestroyOptions) {
+    this.renderer.runners?.prerender?.remove(this._prerender)
     super.destroy(options)
     if (this === Camera.main) {
       // @ts-ignore It's ok, main camera was destroyed.
@@ -97,7 +95,7 @@ export class Camera extends Container3D implements TransformId {
   }
 
   /**
-   * The camera's half-size when in orthographic mode. The visible area from 
+   * The camera's half-size when in orthographic mode. The visible area from
    * center of the screen to the top.
    */
   get orthographicSize() {
@@ -149,14 +147,14 @@ export class Camera extends Container3D implements TransformId {
    * @param viewSize The size of the view when not rendering to the entire screen.
    */
   screenToWorld(x: number, y: number, distance: number, point = new Point3D(), viewSize: { width: number, height: number } = this.renderer.screen) {
-    // Make sure the transform is updated in case something has been changed, 
+    // Make sure the transform is updated in case something has been changed,
     // otherwise it may be using wrong values.
-    this.transform.updateTransform(this.parent?.transform)
+    this.updateTransform3D()
 
     let far = this.far
 
-    // Before doing the calculations, the far clip plane is changed to the same 
-    // value as distance from the camera. By doing this we can just set z value 
+    // Before doing the calculations, the far clip plane is changed to the same
+    // value as distance from the camera. By doing this we can just set z value
     // for the clip space to 1 and the desired z position will be correct.
     this.far = distance
 
@@ -186,9 +184,9 @@ export class Camera extends Container3D implements TransformId {
    * @param viewSize The size of the view when not rendering to the entire screen.
    */
   worldToScreen(x: number, y: number, z: number, point = new Point(), viewSize: { width: number, height: number } = this.renderer.screen) {
-    // Make sure the transform is updated in case something has been changed, 
+    // Make sure the transform is updated in case something has been changed,
     // otherwise it may be using wrong values.
-    this.transform.updateTransform(this.parent?.transform)
+    this.updateTransform3D()
 
     let worldSpace = Vec4.set(x, y, z, 1, vec4)
     let clipSpace = Vec4.transformMat4(
@@ -209,7 +207,7 @@ export class Camera extends Container3D implements TransformId {
   private _aspect?: number
 
   /**
-   * The aspect ratio (width divided by height). If not set, the aspect ratio of 
+   * The aspect ratio (width divided by height). If not set, the aspect ratio of
    * the renderer will be used by default.
    */
   get aspect() {
@@ -296,4 +294,4 @@ export class Camera extends Container3D implements TransformId {
   }
 }
 
-Compatibility.installRendererPlugin("camera", Camera)
+Compatibility.installRendererSystem("camera", Camera)

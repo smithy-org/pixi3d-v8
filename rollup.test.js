@@ -18,7 +18,8 @@ config.push({
       contentBase: [
         "dist/browser",
         "test",
-        "node_modules/mocha"
+        "node_modules/mocha",
+        "node_modules/pixi.js/dist"
       ]
     })
   ]

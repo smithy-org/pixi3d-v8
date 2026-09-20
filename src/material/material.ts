@@ -1,5 +1,4 @@
-import { DRAW_MODES, BLEND_MODES } from "@pixi/constants"
-import { State, Renderer, Program } from "@pixi/core"
+import { BLEND_MODES, State, WebGLRenderer, GlProgram, Topology } from "pixi.js"
 import { Mesh3D } from "../mesh/mesh"
 import { MaterialRenderSortType } from "./material-render-sort-type"
 import { MeshShader } from "../mesh/mesh-shader"
@@ -16,8 +15,8 @@ export class Material {
     culling: true, clockwiseFrontFace: false, depthTest: true
   })
 
-  /** Draw mode used to render a mesh. */
-  drawMode = DRAW_MODES.TRIANGLES
+  /** Draw mode (topology) used to render a mesh. */
+  drawMode: Topology = "triangle-list"
 
   /**
    * Sort type used to render a mesh. Transparent materials will be rendered
@@ -27,8 +26,6 @@ export class Material {
 
   /**
    * Value indicating if writing into the depth buffer is enabled or disabled.
-   * Depth mask feature is only available in PixiJS 6.0+ and won't have any 
-   * effects in previous versions.
    */
   get depthMask() {
     return this.state.depthMask
@@ -64,7 +61,7 @@ export class Material {
    * @param mesh The mesh to create the shader for.
    * @param renderer The renderer to use.
    */
-  createShader(mesh: Mesh3D, renderer: Renderer): MeshShader | undefined {
+  createShader(mesh: Mesh3D, renderer: WebGLRenderer): MeshShader | undefined {
     return undefined
   }
 
@@ -99,12 +96,12 @@ export class Material {
    * @param mesh The mesh to render.
    * @param renderer The renderer to use.
    */
-  render(mesh: Mesh3D, renderer: Renderer) {
+  render(mesh: Mesh3D, renderer: WebGLRenderer) {
     if (!this._shader) {
       this._shader = this.createShader(mesh, renderer)
       if (!this._shader) {
-        // The shader couldn't be created for some reason. Just ignore it and 
-        // try again at next render. The required assets may not have been loaded 
+        // The shader couldn't be created for some reason. Just ignore it and
+        // try again at next render. The required assets may not have been loaded
         // yet, so maybe we are waiting for those.
         return
       }
@@ -125,7 +122,7 @@ export class Material {
   static from(vertexSrc: string, fragmentSrc: string, updateUniforms?: (mesh: Mesh3D, shader: MeshShader) => void): Material {
     return Object.assign(new Material(), {
       updateUniforms: updateUniforms || (() => { }),
-      _shader: new MeshShader(Program.from(vertexSrc, fragmentSrc)),
+      _shader: new MeshShader(GlProgram.from({ vertex: vertexSrc, fragment: fragmentSrc })),
     })
   }
 }

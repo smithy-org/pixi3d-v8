@@ -1,35 +1,46 @@
-import { Renderer, RenderTexture } from "@pixi/core"
-import { SCALE_MODES, TYPES } from "@pixi/constants"
+import { RenderTexture, WebGLRenderer } from "pixi.js"
+import type { SCALE_MODE, TEXTURE_FORMATS } from "pixi.js"
 import { Capabilities } from "../capabilities"
 import { ShadowQuality } from "./shadow-quality"
+import { FLOAT_UPLOAD_METHOD_ID } from "../compatibility/float-texture-uploader"
 
 export namespace ShadowTexture {
-  export function create(renderer: Renderer, size: number, quality: ShadowQuality) {
-    let type = getSupportedType(renderer, quality)
-    return RenderTexture.create({
-      width: size, height: size, type: type, scaleMode: getSupportedScaleMode(renderer)
+  export function create(renderer: WebGLRenderer, size: number, quality: ShadowQuality) {
+    const format = getSupportedFormat(renderer, quality)
+    const texture = RenderTexture.create({
+      width: size,
+      height: size,
+      resolution: 1,
+      format,
+      scaleMode: getSupportedScaleMode(renderer),
+      autoGenerateMipmaps: false,
     })
-  }
-
-  function getSupportedScaleMode(renderer: Renderer) {
-    if (Capabilities.supportsFloatLinear(renderer)) {
-      return SCALE_MODES.LINEAR
+    if (format !== "rgba8unorm") {
+      // Allocated by Pixi3D's float uploader, which also handles WebGL 1.
+      texture.source.uploadMethodId = FLOAT_UPLOAD_METHOD_ID
     }
-    return SCALE_MODES.NEAREST
+    return texture
   }
 
-  function getSupportedType(renderer: Renderer, quality: ShadowQuality) {
+  function getSupportedScaleMode(renderer: WebGLRenderer): SCALE_MODE {
+    if (Capabilities.supportsFloatLinear(renderer)) {
+      return "linear"
+    }
+    return "nearest"
+  }
+
+  function getSupportedFormat(renderer: WebGLRenderer, quality: ShadowQuality): TEXTURE_FORMATS {
     if (quality === ShadowQuality.high) {
       if (Capabilities.isFloatFramebufferSupported(renderer)) {
-        return TYPES.FLOAT
+        return "rgba32float"
       }
       if (Capabilities.isHalfFloatFramebufferSupported(renderer)) {
-        return TYPES.HALF_FLOAT
+        return "rgba16float"
       }
     }
     if (quality === ShadowQuality.medium && Capabilities.isHalfFloatFramebufferSupported(renderer)) {
-      return TYPES.HALF_FLOAT
+      return "rgba16float"
     }
-    return TYPES.UNSIGNED_BYTE
+    return "rgba8unorm"
   }
 }

@@ -1,10 +1,10 @@
-import { BufferResource } from "../../compatibility/buffer-resource"
-import { MIPMAP_MODES, WRAP_MODES, SCALE_MODES, FORMATS, TYPES, ALPHA_MODES } from "@pixi/constants"
-import { Texture, Renderer, BaseTexture } from "@pixi/core"
+import { BufferImageSource, Texture, Renderer } from "pixi.js"
 import { Capabilities } from "../../capabilities"
+import { FLOAT_UPLOAD_METHOD_ID } from "../../compatibility/float-texture-uploader"
 
 export class StandardMaterialMatrixTexture extends Texture {
   private _buffer: Float32Array
+  private _bufferSource: BufferImageSource
 
   static isSupported(renderer: Renderer) {
     return Capabilities.isFloatingPointTextureSupported(renderer)
@@ -12,21 +12,28 @@ export class StandardMaterialMatrixTexture extends Texture {
 
   constructor(matrixCount: number) {
     let buffer = new Float32Array(matrixCount * 16)
-    let resource = new BufferResource(buffer, { width: 4, height: matrixCount })
-    super(new BaseTexture(resource, {
-      mipmap: MIPMAP_MODES.OFF,
-      wrapMode: WRAP_MODES.CLAMP,
-      scaleMode: SCALE_MODES.NEAREST,
-      format: FORMATS.RGBA,
-      type: TYPES.FLOAT,
-      alphaMode: ALPHA_MODES.NO_PREMULTIPLIED_ALPHA,
-      resolution: 1
-    }))
+    // v8's BufferImageSource takes a TypedArray resource directly and infers
+    // pixel format from its type (Float32Array -> 'rgba32float'), replacing
+    // v7's BaseTexture(BufferResource, {format: FORMATS.RGBA, type: TYPES.FLOAT}).
+    let source = new BufferImageSource({
+      resource: buffer,
+      width: 4,
+      height: matrixCount,
+      autoGenerateMipmaps: false,
+      wrapMode: "clamp-to-edge",
+      scaleMode: "nearest",
+      alphaMode: "no-premultiply-alpha",
+      resolution: 1,
+    })
+    // Uploaded by Pixi3D's float uploader, which also handles WebGL 1.
+    source.uploadMethodId = FLOAT_UPLOAD_METHOD_ID
+    super({ source })
     this._buffer = buffer
+    this._bufferSource = source
   }
 
   updateBuffer(buffer: Float32Array) {
     this._buffer.set(buffer)
-    this.baseTexture.resource.update()
+    this._bufferSource.update()
   }
 }

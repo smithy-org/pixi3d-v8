@@ -1,5 +1,5 @@
 import { Color } from "../color"
-import { RenderTexture, Renderer } from "@pixi/core"
+import { RenderTexture, WebGLRenderer, CLEAR } from "pixi.js"
 import { RenderPass } from "./render-pass"
 import { Mesh3D } from "../mesh/mesh"
 
@@ -26,21 +26,18 @@ export class MaterialRenderPass implements RenderPass {
    * @param renderer The renderer to use.
    * @param name The name of the render pass.
    */
-  constructor(public renderer: Renderer, public name: string) { }
+  constructor(public renderer: WebGLRenderer, public name: string) { }
 
   clear() {
     if (this._renderTexture && this.clearColor) {
-      const current = this.renderer.renderTexture.current
-      this.renderer.renderTexture.bind(this._renderTexture)
-      this.renderer.renderTexture.clear(Array.from(this.clearColor.rgba))
-      this.renderer.renderTexture.bind(current || undefined)
+      this.renderer.renderTarget.clear(
+        this._renderTexture, CLEAR.ALL, <any>Array.from(this.clearColor.rgba))
     }
   }
 
   render(meshes: Mesh3D[]) {
-    const current = this.renderer.renderTexture.current
     if (this._renderTexture) {
-      this.renderer.renderTexture.bind(this._renderTexture)
+      this.renderer.renderTarget.push(this._renderTexture, false)
     }
     for (let mesh of meshes) {
       if (mesh.material) {
@@ -48,7 +45,7 @@ export class MaterialRenderPass implements RenderPass {
       }
     }
     if (this._renderTexture) {
-      this.renderer.renderTexture.bind(current || undefined)
+      this.renderer.renderTarget.pop()
     }
   }
 }

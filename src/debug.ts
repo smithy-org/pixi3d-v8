@@ -1,4 +1,4 @@
-import { EventEmitter } from '@pixi/utils';
+import { EventEmitter } from "pixi.js"
 import { Message } from "./message"
 
 export namespace Debug {

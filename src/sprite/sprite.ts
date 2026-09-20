@@ -1,7 +1,5 @@
-import { Renderer, Texture, Resource } from "@pixi/core"
-import { IDestroyOptions } from "@pixi/display"
-import { BLEND_MODES } from "@pixi/constants"
-import { ObservablePoint } from "@pixi/math"
+import { ColorSource, DestroyOptions, InstructionSet, ObservablePoint, Renderer, RenderLayer, Texture } from "pixi.js"
+import type { BLEND_MODES } from "pixi.js"
 import { Camera } from "../camera/camera"
 import { Mat4 } from "../math/mat4"
 import { Vec3 } from "../math/vec3"
@@ -15,6 +13,12 @@ const vec3 = new Float32Array(3)
  * Represents a sprite in 3D space.
  */
 export class Sprite3D extends Container3D {
+  /**
+   * The name of the render pipe that draws the sprite. Sprites are drawn by
+   * the standard pipeline, after the meshes and sorted back to front.
+   */
+  renderPipeId = "pipeline"
+
   private _sprite: ProjectionSprite
   private _modelView = new Float32Array(16)
   private _cameraTransformId?: number
@@ -30,14 +34,14 @@ export class Sprite3D extends Container3D {
    * Creates a new sprite using the specified texture.
    * @param texture The texture to use.
    */
-  constructor(texture?: Texture<Resource>) {
+  constructor(texture?: Texture) {
     super()
     this._sprite = new ProjectionSprite(texture)
     this._sprite.anchor.set(0.5)
   }
 
   /**
-   * The billboard type to use when rendering the sprite. Used for making the 
+   * The billboard type to use when rendering the sprite. Used for making the
    * sprite always face the viewer.
    */
   get billboardType() {
@@ -70,31 +74,53 @@ export class Sprite3D extends Container3D {
   }
 
   /**
-   * The tint applied to the sprite. This is a hex value. A value of 0xFFFFFF 
-   * will remove any tint effect.
+   * The tint applied to the sprite. This is a hex value. A value of 0xFFFFFF
+   * will remove any tint effect. It tints this sprite only, not its children.
    */
-  get tint() {
+  get tint(): number {
     return this._sprite.tint
   }
 
-  set tint(value: number) {
+  set tint(value: ColorSource) {
     this._sprite.tint = value
+  }
+
+  /** The flat sprite the sprite batch renderer draws. */
+  get projectionSprite() {
+    return this._sprite
   }
 
   /**
    * Destroys this sprite and optionally its texture and children.
    */
-  destroy(options?: boolean | IDestroyOptions) {
+  destroy(options?: boolean | DestroyOptions) {
     super.destroy(options)
     this._sprite.destroy(options)
   }
 
   /**
-   * Renders the sprite.
+   * Hands the sprite to its render pipe while the renderer builds its
+   * instruction set, then lets the children collect themselves as usual.
+   * @internal
+   */
+  collectRenderablesSimple(instructionSet: InstructionSet, renderer: Renderer, currentLayer: RenderLayer): void {
+    const pipe = (<any>renderer.renderPipes)[this.renderPipeId]
+    if (pipe?.addRenderable) {
+      pipe.addRenderable(this, instructionSet)
+    }
+    super.collectRenderablesSimple(instructionSet, renderer, currentLayer)
+  }
+
+  /**
+   * Brings the sprite's projection up to date with its camera: the
+   * model-view-projection matrix (with the billboard applied), the distance
+   * used for sorting, the quad and the alpha. The standard pipeline calls
+   * this before it sorts and draws the sprites.
    * @param renderer The renderer to use.
    */
   _render(renderer: Renderer) {
     const camera = this.camera || Camera.main
+    this.updateTransform3D()
     const update = camera.transformId !== this._cameraTransformId ||
       this._parentID !== this.transform._worldID
 
@@ -129,20 +155,20 @@ export class Sprite3D extends Container3D {
         this._modelView, this._sprite.modelViewProjection.array)
       this._parentID = this.transform._worldID
       this._cameraTransformId = camera.transformId
-      const dir = Vec3.subtract(camera.worldTransform.position.array, 
+      const dir = Vec3.subtract(camera.worldTransform.position.array,
         this.worldTransform.position.array, vec3)
       const projection = Vec3.scale(camera.worldTransform.forward.array,
         Vec3.dot(dir, camera.worldTransform.forward.array), vec3)
       this._sprite.distanceFromCamera = Vec3.squaredMagnitude(projection)
     }
-    this._sprite.worldAlpha = this.worldAlpha
-    this._sprite.render(renderer)
+    this._sprite.calculateVertices(renderer.resolution)
+    this._sprite.worldAlpha = this.groupAlpha
   }
 
   /**
    * The anchor sets the origin point of the sprite.
    */
-  get anchor() {
+  get anchor(): ObservablePoint {
     return this._sprite.anchor
   }
 
@@ -151,16 +177,16 @@ export class Sprite3D extends Container3D {
   }
 
   /** The texture used when rendering the sprite. */
-  get texture() {
+  get texture(): Texture {
     return this._sprite.texture
   }
 
-  set texture(value: Texture<Resource>) {
+  set texture(value: Texture) {
     this._sprite.texture = value
   }
 
   /** The blend used when rendering the sprite. */
-  get blendMode() {
+  get blendMode(): BLEND_MODES {
     return this._sprite.blendMode
   }
 

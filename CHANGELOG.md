@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0-alpha.2] - 2026-09-19 (unofficial fork)
+### Changed
+- Picking no longer hit tests the whole stage after a render that drew no
+  meshes. Every renderer created after Pixi3D loads has a picking
+  interaction, so a renderer drawing only 2D paid for that walk on every
+  frame, as it did in 2.5.0. Where meshes are drawn, picking works as
+  before.
+- The picking map is created when a hit area is first tested, rather than
+  with every renderer.
+
+## [3.0.0-alpha.1] - 2026-09-18 (unofficial fork)
+### Changed
+- Ported to PixiJS v8 (8.20 or later), keeping the API of 2.5.0 wherever
+  PixiJS v8 allows. Every difference is listed in
+  [MIGRATION_V8.md](MIGRATION_V8.md); the port's progress is in
+  [PORT_STATUS.md](PORT_STATUS.md).
+- One entry point, `pixi3d`: the `pixi3d/pixi7` entry point is gone.
+
+### Removed
+- Support for PixiJS v5, v6 and v7. Use 2.5.0 for those.
+
 ## [2.5.0] - 2023-12-17
 ### Added
 - Added support mesh quantization.

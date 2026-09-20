@@ -41,7 +41,7 @@ export class Model extends Container3D {
    * space. The bounding box will encapsulate the meshes included in the model.
    */
   getBoundingBox() {
-    this.updateTransform()
+    this.updateTransform3D()
 
     let aabb = new AABB()
     let mesh = this.meshes[0].getBoundingBox()

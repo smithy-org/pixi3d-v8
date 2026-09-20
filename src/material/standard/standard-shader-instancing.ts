@@ -1,21 +1,23 @@
-import { Buffer, Geometry } from "@pixi/core"
-
+import { Buffer, BufferUsage, Geometry } from "pixi.js"
 import { InstancedMesh3D } from "../../mesh/instanced-mesh"
 import { InstancedStandardMaterial } from "./instanced-standard-material"
+
+const createBuffer = (size: number) => new Buffer({
+  data: new Float32Array(size), usage: BufferUsage.VERTEX | BufferUsage.COPY_DST
+})
 
 export class StandardShaderInstancing {
   private _maxInstances = 200
 
-  private _modelMatrix: Buffer[] = [
-    new Buffer(), new Buffer(), new Buffer(), new Buffer()
-  ]
-  private _normalMatrix: Buffer[] = [
-    new Buffer(), new Buffer(), new Buffer(), new Buffer()
-  ]
-  private _baseColor = new Buffer()
+  private _modelMatrix: Buffer[]
+  private _normalMatrix: Buffer[]
+  private _baseColor: Buffer
 
   constructor() {
-    this.expandBuffers(this._maxInstances)
+    const size = 4 * this._maxInstances
+    this._modelMatrix = [createBuffer(size), createBuffer(size), createBuffer(size), createBuffer(size)]
+    this._normalMatrix = [createBuffer(size), createBuffer(size), createBuffer(size), createBuffer(size)]
+    this._baseColor = createBuffer(size)
   }
 
   expandBuffers(instanceCount: number) {
@@ -23,10 +25,10 @@ export class StandardShaderInstancing {
       this._maxInstances += Math.floor(this._maxInstances * 0.5)
     }
     for (let i = 0; i < 4; i++) {
-      this._modelMatrix[i].update(new Float32Array(4 * this._maxInstances))
-      this._normalMatrix[i].update(new Float32Array(4 * this._maxInstances))
+      this._modelMatrix[i].data = new Float32Array(4 * this._maxInstances)
+      this._normalMatrix[i].data = new Float32Array(4 * this._maxInstances)
     }
-    this._baseColor.update(new Float32Array(4 * this._maxInstances))
+    this._baseColor.data = new Float32Array(4 * this._maxInstances)
   }
 
   updateBuffers(instances: InstancedMesh3D[]) {
@@ -35,6 +37,7 @@ export class StandardShaderInstancing {
     }
     let bufferIndex = 0
     for (let i = 0; i < instances.length; i++) {
+      instances[i].updateTransform3D()
       const normal = instances[i].transform.normalTransform.array
       for (let j = 0; j < 4; j++) {
         (<Float32Array>this._normalMatrix[j].data)
@@ -60,14 +63,17 @@ export class StandardShaderInstancing {
 
   addGeometryAttributes(geometry: Geometry) {
     for (let i = 0; i < 4; i++) {
-      geometry.addAttribute(`a_ModelMatrix${i}`,
-        this._modelMatrix[i], 4, false, undefined, 0, undefined, true)
+      geometry.addAttribute(`a_ModelMatrix${i}`, {
+        buffer: this._modelMatrix[i], format: "float32x4", instance: true
+      })
     }
     for (let i = 0; i < 4; i++) {
-      geometry.addAttribute(`a_NormalMatrix${i}`,
-        this._normalMatrix[i], 4, false, undefined, 0, undefined, true)
+      geometry.addAttribute(`a_NormalMatrix${i}`, {
+        buffer: this._normalMatrix[i], format: "float32x4", instance: true
+      })
     }
-    geometry.addAttribute("a_BaseColorFactor",
-      this._baseColor, 4, false, undefined, 0, undefined, true)
+    geometry.addAttribute("a_BaseColorFactor", {
+      buffer: this._baseColor, format: "float32x4", instance: true
+    })
   }
 }

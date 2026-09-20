@@ -1,5 +1,3 @@
-#version 100
-
 attribute vec3 a_Position;
 
 uniform mat4 u_ModelViewProjection;

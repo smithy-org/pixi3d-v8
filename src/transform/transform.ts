@@ -1,4 +1,3 @@
-import { Transform } from "@pixi/math"
 import { Matrix4x4 } from "./matrix"
 import { Point3D } from "./point"
 import { Quaternion } from "./quaternion"
@@ -6,8 +5,24 @@ import { Mat4 } from "../math/mat4"
 
 /**
  * Handles position, scaling and rotation in 3D.
+ *
+ * Standalone since the PixiJS v8 port: v8 removed the `Transform` class this
+ * used to extend (2D containers now own their matrices directly), and the 3D
+ * hierarchy is no longer walked by the renderer. `Container3D.updateTransform3D`
+ * drives `updateTransform` for the meshes being drawn.
  */
-export class Transform3D extends Transform {
+export class Transform3D {
+  /** @internal Bumped whenever position, scale or rotation change. */
+  _localID = 0
+  /** @internal The local id the local matrix was last computed for. */
+  _currentLocalID = 0
+  /** @internal Bumped whenever the world matrix is recomputed. */
+  _worldID = 0
+  /**
+   * @internal The parent's world id the world matrix was last computed
+   * against; -1 means "needs recomputing", -2 means "computed with no parent".
+   */
+  _parentID = -1
 
   /** The position in local space. */
   position = new Point3D(0, 0, 0, this.onChange, this)
@@ -29,6 +44,10 @@ export class Transform3D extends Transform {
 
   /** The normal transformation matrix. */
   normalTransform = new Matrix4x4()
+
+  protected onChange() {
+    this._localID++
+  }
 
   /**
    * Updates the local transformation matrix.
@@ -59,21 +78,20 @@ export class Transform3D extends Transform {
    * Updates the world transformation matrix.
    * @param parentTransform The parent transform.
    */
-  updateTransform(parentTransform?: Transform) {
+  updateTransform(parentTransform?: Transform3D) {
     this.updateLocalTransform()
-    if (parentTransform && this._parentID === parentTransform._worldID) {
+    const parentID = parentTransform ? parentTransform._worldID : -2
+    if (this._parentID === parentID) {
       return
     }
     this.worldTransform.copyFrom(this.localTransform)
-    if (parentTransform instanceof Transform3D) {
+    if (parentTransform) {
       this.worldTransform.multiply(parentTransform.worldTransform)
     }
     Mat4.invert(this.worldTransform.array, this.inverseWorldTransform.array)
     Mat4.transpose(this.inverseWorldTransform.array, this.normalTransform.array)
     this._worldID++
-    if (parentTransform) {
-      this._parentID = parentTransform._worldID
-    }
+    this._parentID = parentID
   }
 
   /**

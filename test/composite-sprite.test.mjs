@@ -7,12 +7,11 @@ describe("Composite sprite", () => {
       let model = PIXI3D.Model.from(resources["assets/teapot/teapot.gltf"].gltf)
       model.y = -0.8
 
-      // Filters was moved in PixiJS 7.1.0
-      let BlurFilter = PIXI.BlurFilter || PIXI.filters.BlurFilter
-
       let sprite = new PIXI3D.CompositeSprite(renderer)
       sprite.renderObject(model)
-      sprite.filters = [new BlurFilter()]
+      // PixiJS v8's blur spreads its strength over the passes differently;
+      // its legacy mode is v7's blur, which the snapshot was made with.
+      sprite.filters = [new PIXI.BlurFilter({ legacy: true })]
 
       renderer.render(sprite)
     }

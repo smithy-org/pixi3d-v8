@@ -1,4 +1,4 @@
-import { BaseTexture } from "@pixi/core"
+import { TextureSource } from "pixi.js"
 import { StandardMaterialTexture } from "./standard-material-texture"
 
 /**
@@ -6,12 +6,12 @@ import { StandardMaterialTexture } from "./standard-material-texture"
  */
 export class StandardMaterialNormalTexture extends StandardMaterialTexture {
   /**
-   * Creates a new texture from the specified base texture.
-   * @param baseTexture The base texture.
+   * Creates a new texture from the specified texture source.
+   * @param source The texture source.
    * @param scale The scale of the normal.
    * @param uvSet The uv set to use (0 or 1).
    */
-  constructor(baseTexture: BaseTexture, public scale?: number, public uvSet?: number) {
-    super(baseTexture, uvSet)
+  constructor(source: TextureSource, public scale?: number, public uvSet?: number) {
+    super(source, uvSet)
   }
 }

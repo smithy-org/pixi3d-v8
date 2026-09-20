@@ -1,6 +1,4 @@
-import { ObservablePoint } from "@pixi/math"
-import type { InteractionEvent } from "@pixi/interaction"
-import { Compatibility } from "../compatibility/compatibility"
+import { ObservablePoint } from "pixi.js"
 import { Quat } from "../math/quat"
 import { Vec3 } from "../math/vec3"
 import { Camera } from "./camera"
@@ -9,9 +7,9 @@ import { Camera } from "./camera"
  * Allows the user to control the camera by orbiting the target.
  */
 export class CameraOrbitControl {
-  protected _autoUpdate = true;
+  protected _autoUpdate = true
 
-  /** 
+  /**
    * Whether to auto update the camera on prerender.
    * Default is true.
    */
@@ -25,7 +23,7 @@ export class CameraOrbitControl {
 
   protected _allowControl = true
 
-  /** 
+  /**
    * Allows the camera to be controlled by user.
    */
   get allowControl(): boolean {
@@ -38,7 +36,7 @@ export class CameraOrbitControl {
 
   protected _camera = Camera.main
 
-  /** 
+  /**
    * The camera being controlled.
    */
   get camera(): Camera {
@@ -51,7 +49,7 @@ export class CameraOrbitControl {
 
   protected _target = { x: 0, y: 0, z: 0 }
 
-  /** 
+  /**
    * Target position (x, y, z) to orbit.
    */
   get target(): { x: number; y: number; z: number } {
@@ -62,9 +60,11 @@ export class CameraOrbitControl {
     this._target = value
   }
 
-  protected _angles = new ObservablePoint(() => {
-    this._angles.x = Math.min(Math.max(-85, this._angles.x), 85)
-  }, undefined, 0, 180)
+  protected _angles = new ObservablePoint({
+    _onUpdate: () => {
+      this._angles.x = Math.min(Math.max(-85, this._angles.x), 85)
+    }
+  }, 0, 180)
 
   /**
    * Orientation euler angles (x-axis and y-axis).
@@ -90,7 +90,7 @@ export class CameraOrbitControl {
 
   protected _enableDamping = false
 
-  /** 
+  /**
    * Value indicating if damping (inertia) is enabled, which can be used to give a sense of weight to the controls.
    * Default is false.
    */
@@ -104,7 +104,7 @@ export class CameraOrbitControl {
 
   protected _dampingFactor = 0.1
 
-  /** 
+  /**
    * The damping inertia used if enableDamping is true.
    * Default is 0.1.
    */
@@ -129,6 +129,12 @@ export class CameraOrbitControl {
   protected _dampingAngles = { x: 0, y: 180 }
 
   protected _dampingDistance = 5
+
+  /**
+   * The object registered with the renderer's "prerender" runner, which calls
+   * its `prerender` method before every frame.
+   */
+  protected _prerenderHook?: { prerender: () => void }
 
   /**
    * Creates a new camera orbit control.
@@ -171,21 +177,6 @@ export class CameraOrbitControl {
   protected onPreRender = (): void => {
     if (this.autoUpdate) {
       this.updateCamera()
-    }
-  }
-
-  protected onMouseDownInteraction = (e: InteractionEvent): void => {
-    if (this.allowControl) {
-      if (!e.stopped) {
-        this._grabbed = true
-        const originalEvent = e.data.originalEvent
-        const touchEvent = originalEvent as TouchEvent
-        const mouseEvent = originalEvent as MouseEvent
-        const touch = touchEvent?.targetTouches?.[0]
-        const clientX = touch?.clientX ?? mouseEvent?.clientX
-        const clientY = touch?.clientY ?? mouseEvent?.clientY
-        this.onPointerDown(clientX, clientY)
-      }
     }
   }
 
@@ -273,11 +264,11 @@ export class CameraOrbitControl {
   }
 
   protected bind(): void {
-    this.camera.renderer.on("prerender", this.onPreRender)
-    let interaction = Compatibility.getInteractionPlugin(this.camera.renderer)
-    if (interaction) {
-      interaction.on("mousedown", this.onMouseDownInteraction)
-    }
+    // PixiJS v8 renderers no longer emit a "prerender" event; the equivalent
+    // is the "prerender" runner, which calls a method of that name on every
+    // object added to it before each frame.
+    this._prerenderHook = { prerender: this.onPreRender }
+    this.camera.renderer.runners.prerender.add(this._prerenderHook)
     this._element.addEventListener("mousedown", this.onMouseDown)
     this._element.addEventListener("touchstart", this.onTouchStart)
     this._element.addEventListener("wheel", this.onWheel)
@@ -290,6 +281,10 @@ export class CameraOrbitControl {
   }
 
   protected unbind(): void {
+    if (this._prerenderHook) {
+      this.camera.renderer.runners.prerender.remove(this._prerenderHook)
+      this._prerenderHook = undefined
+    }
     this._element.removeEventListener("mousedown", this.onMouseDown)
     this._element.removeEventListener("touchstart", this.onTouchStart)
     this._element.removeEventListener("wheel", this.onWheel)

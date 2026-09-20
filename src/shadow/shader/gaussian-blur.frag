@@ -10,6 +10,8 @@
 
 #ifdef WEBGL2
   out vec4 FRAG_COLOR;
+  // GLSL ES 3.00 has no texture2D.
+  #define texture2D texture
 #endif
 
 FRAG_IN vec2 v_UV1;

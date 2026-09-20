@@ -13,7 +13,7 @@ describe("Camera orbit control", () => {
       light.rotationQuaternion.setEulerAngles(0, 50, 0)
       lightingEnvironment.lights.push(light)
 
-      let control = new PIXI3D.CameraOrbitControl(renderer.view)
+      let control = new PIXI3D.CameraOrbitControl(renderer.canvas)
       control.angles.x = 45
       control.angles.y = 0
       control.distance = 10
@@ -42,7 +42,7 @@ describe("Camera orbit control", () => {
       light.rotationQuaternion.setEulerAngles(0, 50, 0)
       lightingEnvironment.lights.push(light)
 
-      let control = new PIXI3D.CameraOrbitControl(renderer.view)
+      let control = new PIXI3D.CameraOrbitControl(renderer.canvas)
       control.target = { x: -1, y: 3, z: 0 }
       control.updateCamera()
       let model = PIXI3D.Model.from(resources["assets/teapot/teapot.gltf"].gltf)

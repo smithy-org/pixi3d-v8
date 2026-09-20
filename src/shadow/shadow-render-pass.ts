@@ -1,4 +1,4 @@
-import { Renderer } from "@pixi/core"
+import { WebGLRenderer, CLEAR } from "pixi.js"
 import { RenderPass } from "../pipeline/render-pass"
 import { Mesh3D } from "../mesh/mesh"
 import { ShadowFilter } from "./shadow-filter"
@@ -18,7 +18,7 @@ export class ShadowRenderPass implements RenderPass {
    * @param renderer The renderer to use.
    * @param name The name for the render pass.
    */
-  constructor(public renderer: Renderer, public name = "shadow") {
+  constructor(public renderer: WebGLRenderer, public name = "shadow") {
     this._filter = new ShadowFilter(renderer)
     this._shadow = new ShadowRenderer(renderer)
   }
@@ -54,17 +54,21 @@ export class ShadowRenderPass implements RenderPass {
     if (meshes.length === 0 || this._lights.length === 0) {
       return
     }
-    const current = this.renderer.renderTexture.current
     for (let shadowCastingLight of this._lights) {
-      this.renderer.renderTexture.bind(shadowCastingLight.shadowTexture)
+      // The shadow map is rebuilt from scratch every frame, so it is cleared
+      // (color and depth) as it is bound rather than relying on a separate
+      // clear having run earlier in the frame.
+      this.renderer.renderTarget.push({
+        target: shadowCastingLight.renderTarget, clear: CLEAR.ALL, clearColor: [0, 0, 0, 0]
+      })
       shadowCastingLight.updateLightViewProjection()
       for (let mesh of meshes) {
         this._shadow.render(mesh, shadowCastingLight)
       }
+      this.renderer.renderTarget.pop()
       if (shadowCastingLight.softness > 0) {
         this._filter.applyGaussianBlur(shadowCastingLight)
       }
     }
-    this.renderer.renderTexture.bind(current || undefined)
   }
 }

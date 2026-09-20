@@ -1,6 +1,7 @@
-import { Renderer, Program, Geometry, State, Buffer } from "@pixi/core"
+import { WebGLRenderer, GlProgram, Geometry, State } from "pixi.js"
 import { MeshGeometry3D } from "../mesh/geometry/mesh-geometry"
 import { MeshShader } from "../mesh/mesh-shader"
+import { createAttribute, createIndexBuffer } from "../mesh/geometry/mesh-geometry-buffers"
 import { StandardShaderSource } from "../material/standard/standard-shader-source"
 import { Mesh3D } from "../mesh/mesh"
 import { ShadowCastingLight } from "./shadow-casting-light"
@@ -10,14 +11,15 @@ import { ShadowShaderInstancing } from "./shadow-shader-instancing"
 import { ShadowMaterialFeatureSet } from "./shadow-material-feature-set"
 
 export class ShadowShader extends MeshShader {
-  private _instancing: ShadowShaderInstancing;
+  private _instancing: ShadowShaderInstancing
 
-  constructor(renderer: Renderer, features: string[] = []) {
-    features = ShadowMaterialFeatureSet.build(renderer, features);
-    super(Program.from(
-      StandardShaderSource.build(Vertex.source, features, renderer),
-      StandardShaderSource.build(Fragment.source, features, renderer)))
-    this._instancing = new ShadowShaderInstancing();
+  constructor(renderer: WebGLRenderer, features: string[] = []) {
+    features = ShadowMaterialFeatureSet.build(renderer, features)
+    super(GlProgram.from({
+      vertex: StandardShaderSource.build(Vertex.source, features, renderer),
+      fragment: StandardShaderSource.build(Fragment.source, features, renderer),
+    }))
+    this._instancing = new ShadowShaderInstancing()
   }
 
   get maxSupportedJoints() {
@@ -27,21 +29,14 @@ export class ShadowShader extends MeshShader {
   createShaderGeometry(geometry: MeshGeometry3D, instanced: boolean) {
     let result = new Geometry()
     if (geometry.indices) {
-      if (geometry.indices.buffer.BYTES_PER_ELEMENT === 1) {
-        // PixiJS seems to have problems with Uint8Array, let's convert to UNSIGNED_SHORT.
-        result.addIndex(new Buffer(new Uint16Array(geometry.indices.buffer)))
-      } else {
-        result.addIndex(new Buffer(geometry.indices.buffer))
-      }
+      result.addIndex(createIndexBuffer(geometry.indices))
     }
     if (geometry.positions) {
-      result.addAttribute("a_Position", new Buffer(geometry.positions.buffer),
-        3, false, geometry.positions.componentType, geometry.positions.stride)
+      result.addAttribute("a_Position", createAttribute(geometry.positions, 3))
     }
     if (instanced) {
       this._instancing.addGeometryAttributes(result)
     }
-
     return result
   }
 
@@ -49,12 +44,12 @@ export class ShadowShader extends MeshShader {
     return "shadow-shader"
   }
 
-  render(mesh: Mesh3D, renderer: Renderer, state: State) {
+  render(mesh: Mesh3D, renderer: WebGLRenderer, state: State) {
     if (mesh.instances.length > 0) {
-      const filteredInstances = mesh.instances.filter((instance) => instance.worldVisible && instance.renderable);
+      const filteredInstances = mesh.instances.filter((instance) => instance.isRenderable)
       if (filteredInstances.length === 0) {
-        //early exit - this avoids us drawing the last known instance in the instance buffer
-        return;
+        // Early exit, this avoids drawing the last known instance in the instance buffer.
+        return
       }
       this._instancing.updateBuffers(filteredInstances)
     }

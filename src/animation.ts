@@ -1,6 +1,4 @@
-import { Ticker } from '@pixi/ticker';
-import { EventEmitter } from '@pixi/utils';
-
+import { Ticker, EventEmitter } from "pixi.js"
 /**
  * Represents an animation.
  */

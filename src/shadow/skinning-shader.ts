@@ -1,7 +1,8 @@
-import { Renderer, Buffer } from "@pixi/core"
+import { WebGLRenderer } from "pixi.js"
 import { MeshGeometry3D } from "../mesh/geometry/mesh-geometry"
 import { Mesh3D } from "../mesh/mesh"
 import { Capabilities } from "../capabilities"
+import { createAttribute } from "../mesh/geometry/mesh-geometry-buffers"
 import { ShadowCastingLight } from "./shadow-casting-light"
 import { ShadowShader } from "./shadow-shader"
 
@@ -12,7 +13,7 @@ export class SkinningShader extends ShadowShader {
     return this._maxSupportedJoints
   }
 
-  static getMaxJointCount(renderer: Renderer) {
+  static getMaxJointCount(renderer: WebGLRenderer) {
     let uniformsRequiredForOtherFeatures = 8
     let availableVertexUniforms =
       Capabilities.getMaxVertexUniformVectors(renderer) - uniformsRequiredForOtherFeatures
@@ -20,7 +21,7 @@ export class SkinningShader extends ShadowShader {
     return Math.floor(availableVertexUniforms / uniformsRequiredPerJoint)
   }
 
-  constructor(renderer: Renderer) {
+  constructor(renderer: WebGLRenderer) {
     // When setting the MAX_JOINT_COUNT, it needs to be subtracted by 1 for
     // some reason. Otherwise it will exceeed maximum vertex uniforms.
     const maxJointCount = SkinningShader.getMaxJointCount(renderer) - 1
@@ -31,12 +32,10 @@ export class SkinningShader extends ShadowShader {
   createShaderGeometry(geometry: MeshGeometry3D, instanced: boolean) {
     let result = super.createShaderGeometry(geometry, instanced)
     if (geometry.joints) {
-      result.addAttribute("a_Joint1", new Buffer(geometry.joints.buffer),
-        4, false, geometry.joints.componentType, geometry.joints.stride)
+      result.addAttribute("a_Joint1", createAttribute(geometry.joints, 4))
     }
     if (geometry.weights) {
-      result.addAttribute("a_Weight1", new Buffer(geometry.weights.buffer),
-        4, false, geometry.weights.componentType, geometry.weights.stride)
+      result.addAttribute("a_Weight1", createAttribute(geometry.weights, 4))
     }
     return result
   }

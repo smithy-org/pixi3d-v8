@@ -1,6 +1,5 @@
-import { Shader } from "@pixi/core"
-
 import { Mesh3D } from "../../mesh/mesh"
+import { MeshShader } from "../../mesh/mesh-shader"
 import { StandardMaterialMatrixTexture } from "./standard-material-matrix-texture"
 
 export class StandardMaterialSkinUniforms {
@@ -21,7 +20,7 @@ export class StandardMaterialSkinUniforms {
     this._jointMatrixTexture?.destroy(true)
   }
 
-  update(mesh: Mesh3D, shader: Shader) {
+  update(mesh: Mesh3D, shader: MeshShader) {
     if (!mesh.skin) {
       return
     }

@@ -35,7 +35,11 @@ export class Skin {
    * Calculates the joint matrices.
    */
   calculateJointMatrices() {
+    // PixiJS v8 does not update 3D transforms while rendering, so the joints
+    // (rarely ancestors of the mesh) are brought up to date here.
+    this.parent.updateTransform3D()
     for (let i = 0; i < this.joints.length; i++) {
+      this.joints[i].updateTransform3D()
       if (this.joints[i].transform._worldID === this._transformIds[i]) {
         // The joint transform hasn't changed, no need to calculate.
         continue

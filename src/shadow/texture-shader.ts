@@ -1,6 +1,7 @@
-import { Renderer, Buffer } from "@pixi/core"
+import { WebGLRenderer } from "pixi.js"
 import { MeshGeometry3D } from "../mesh/geometry/mesh-geometry"
 import { Mesh3D } from "../mesh/mesh"
+import { createAttribute } from "../mesh/geometry/mesh-geometry-buffers"
 import { ShadowCastingLight } from "./shadow-casting-light"
 import { ShadowShader } from "./shadow-shader"
 import { StandardMaterialMatrixTexture } from "../material/standard/standard-material-matrix-texture"
@@ -10,7 +11,7 @@ const MAX_SUPPORTED_JOINTS = 256
 export class TextureShader extends ShadowShader {
   private _jointMatrixTexture: StandardMaterialMatrixTexture
 
-  static isSupported(renderer: Renderer) {
+  static isSupported(renderer: WebGLRenderer) {
     return StandardMaterialMatrixTexture.isSupported(renderer)
   }
 
@@ -18,7 +19,7 @@ export class TextureShader extends ShadowShader {
     return MAX_SUPPORTED_JOINTS
   }
 
-  constructor(renderer: Renderer) {
+  constructor(renderer: WebGLRenderer) {
     super(renderer, [
       "USE_SKINNING 1", "USE_SKINNING_TEXTURE 1", "MAX_JOINT_COUNT " + MAX_SUPPORTED_JOINTS
     ])
@@ -29,12 +30,10 @@ export class TextureShader extends ShadowShader {
   createShaderGeometry(geometry: MeshGeometry3D, instanced: boolean) {
     let result = super.createShaderGeometry(geometry, instanced)
     if (geometry.joints) {
-      result.addAttribute("a_Joint1", new Buffer(geometry.joints.buffer),
-        4, false, geometry.joints.componentType, geometry.joints.stride)
+      result.addAttribute("a_Joint1", createAttribute(geometry.joints, 4))
     }
     if (geometry.weights) {
-      result.addAttribute("a_Weight1", new Buffer(geometry.weights.buffer),
-        4, false, geometry.weights.componentType, geometry.weights.stride)
+      result.addAttribute("a_Weight1", createAttribute(geometry.weights, 4))
     }
     return result
   }

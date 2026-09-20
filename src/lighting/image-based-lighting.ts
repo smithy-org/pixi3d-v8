@@ -1,8 +1,26 @@
-import { Texture } from "@pixi/core"
-import { MIPMAP_MODES } from "@pixi/constants"
+import { Texture, ImageSource } from "pixi.js"
 import { Cubemap } from "../cubemap/cubemap"
 
 import png from "./assets/lut-ggx.png"
+
+/**
+ * Creates a texture from an inline (data URL) image. PixiJS v8's
+ * `Texture.from` no longer loads from a URL; until the image has decoded the
+ * texture reports its size as 0x0, which the renderer skips, and it is
+ * resized and re-uploaded on load.
+ */
+function textureFromDataUrl(url: string) {
+  const image = new Image()
+  const source = new ImageSource({
+    resource: image, autoGenerateMipmaps: false, alphaMode: "no-premultiply-alpha"
+  })
+  image.onload = () => {
+    source.resize(image.naturalWidth, image.naturalHeight)
+    source.update()
+  }
+  image.src = url
+  return new Texture({ source })
+}
 
 /**
  * Collection of components used for image-based lighting (IBL), a
@@ -12,11 +30,23 @@ import png from "./assets/lut-ggx.png"
 export class ImageBasedLighting {
   private _diffuse: Cubemap
   private _specular: Cubemap
+  private static _defaultLookupBrdf?: Texture
 
-  /** The default BRDF integration map lookup texture. */
-  static defaultLookupBrdf = Texture.from(png, {
-    mipmap: MIPMAP_MODES.OFF
-  })
+  /**
+   * The default BRDF integration map lookup texture. Its image starts
+   * decoding as soon as the library is loaded (see below), so it is ready by
+   * the time the first scene is rendered.
+   */
+  static get defaultLookupBrdf(): Texture {
+    if (!this._defaultLookupBrdf) {
+      this._defaultLookupBrdf = textureFromDataUrl(png)
+    }
+    return this._defaultLookupBrdf
+  }
+
+  static set defaultLookupBrdf(value: Texture) {
+    this._defaultLookupBrdf = value
+  }
 
   /** Cube texture used for the diffuse component. */
   get diffuse() {
@@ -45,7 +75,14 @@ export class ImageBasedLighting {
    * Value indicating if this object is valid to be used for rendering.
    */
   get valid() {
-    return this._diffuse.valid &&
-      this._specular.valid && (!this.lookupBrdf || this.lookupBrdf.valid)
+    return this._diffuse.valid && this._specular.valid
   }
+}
+
+// Decode the default lookup texture now, as PixiJS v7 did when it was a
+// static field: a texture created on first use would still be decoding
+// during the first render, and metallic surfaces would render black. Where
+// there is no DOM, it is created on first use instead.
+if (typeof Image !== "undefined") {
+  ImageBasedLighting.defaultLookupBrdf
 }

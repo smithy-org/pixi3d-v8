@@ -1,10 +1,7 @@
-import type { Loader } from "@pixi/loaders"
-import { settings } from "@pixi/settings"
-import { Texture } from "@pixi/core"
+import { Assets, checkExtension, DOMAdapter, extensions, ExtensionType, LoaderParserPriority } from "pixi.js"
+import type { Loader, LoaderParser, ResolvedAsset, Texture } from "pixi.js"
 import { Cubemap } from "../cubemap/cubemap"
-import { CubemapFaces } from "../cubemap/cubemap-faces"
-import { LoaderResourceResponseType } from "../compatibility/compatibility-version"
-import { Compatibility } from "../compatibility/compatibility"
+import type { CubemapFaces } from "../cubemap/cubemap-faces"
 import { CubemapFormat } from "../cubemap/cubemap-format"
 
 interface CubemapFileVersion {
@@ -45,86 +42,47 @@ namespace CubemapFileVersionSelector {
   }
 }
 
-export const CubemapLoader = {
-  use: function (resource: any, next: () => void) {
-    if (resource.extension !== "cubemap") {
-      return next()
-    }
-    const loader = <Loader><unknown>this
-    const version = CubemapFileVersionSelector.getFileVersion(resource.data)
-    const mipmaps = version.mipmaps.map(mipmap => {
-      return Cubemap.faces.map(face => {
-        return resource.url.substring(0, resource.url.lastIndexOf("/") + 1) + mipmap.replace("{{face}}", face)
-      })
-    })
+/** The face keys in the order the `{{face}}` placeholder is expanded. */
+const FACES = ["posx", "negx", "posy", "negy", "posz", "negz"] as const
 
-    // The list of urls (faces and mipmaps) which needs to be loaded before the 
-    // cubemap should be created.
-    let urls = mipmaps.reduce((acc, val) => acc.concat(val), [])
+/**
+ * Load parser for `.cubemap` files (a JSON list of face image urls, one per
+ * mipmap level): `Assets.load("environment.cubemap")` resolves to a
+ * `Cubemap`. The face images are loaded through the same loader so they
+ * share its cache.
+ */
+export const CubemapLoader: LoaderParser<Cubemap> = {
+  extension: {
+    type: ExtensionType.LoadParser,
+    priority: LoaderParserPriority.Normal,
+    name: "cubemap",
+  },
+  id: "cubemap",
+  // Deprecated in favour of `id`, but PixiJS 8.20 still validates parsers by
+  // name: two parsers without one are reported as a conflict.
+  name: "cubemap",
+  test(url: string) {
+    return checkExtension(url, ".cubemap")
+  },
+  async load(url: string, _asset?: ResolvedAsset, loader?: Loader): Promise<Cubemap> {
+    const response = await DOMAdapter.get().fetch(url)
+    const version = CubemapFileVersionSelector.getFileVersion(await response.json())
+    const directory = url.substring(0, url.lastIndexOf("/") + 1)
+    const loadTexture = (face: string) =>
+      loader ? loader.load<Texture>(face) : Assets.load<Texture>(face)
 
-    loader.add(urls.filter(url => !loader.resources[url]).map((url) => {
-      return { parentResource: resource, url: url }
+    const mipmaps = await Promise.all(version.mipmaps.map(async mipmap => {
+      const textures = await Promise.all(FACES.map(face =>
+        loadTexture(directory + mipmap.replace("{{face}}", face))))
+      const faces = <CubemapFaces>{}
+      FACES.forEach((face, i) => faces[face] = textures[i])
+      return faces
     }))
-    let completed = 0
-
-    // Listen for resources being loaded.
-    let binding = loader.onLoad.add((loader: any, res: any) => {
-      if (urls.includes(res.url)) {
-        if (++completed === urls.length) {
-          // All resources used by cubemap has been loaded.
-          const textures = mipmaps.map(face => {
-            return <CubemapFaces>{
-              posx: Texture.from(face[0]),
-              negx: Texture.from(face[1]),
-              posy: Texture.from(face[2]),
-              negy: Texture.from(face[3]),
-              posz: Texture.from(face[4]),
-              negz: Texture.from(face[5]),
-            }
-          })
-          let cubemap = Cubemap.fromFaces(textures)
-          cubemap.cubemapFormat = version.format
-          resource.cubemap = cubemap
-          binding.detach(); next()
-        }
-      }
-    })
-  },
-  add: function () {
-    Compatibility.setLoaderResourceExtensionType("cubemap",
-      LoaderResourceResponseType.json)
-  },
-  test(url: string): boolean {
-    return url.includes(".cubemap")
-  },
-  async load(url: string): Promise<Cubemap> {
-    if (!Compatibility.assets) {
-      throw new Error("PIXI3D: This feature is only available when using PixiJS v7+")
+    if (mipmaps.length === 1) {
+      return Cubemap.fromFaces(mipmaps[0], version.format)
     }
-    const response = await settings.ADAPTER.fetch(url)
-    const json = await response.json()
-    const version = CubemapFileVersionSelector.getFileVersion(json)
-    const mipmaps = version.mipmaps.map(mipmap => {
-      return Cubemap.faces.map(face => {
-        return url.substring(0, url.lastIndexOf("/") + 1) + mipmap.replace("{{face}}", face)
-      })
-    })
-    const textures: CubemapFaces[] = []
-    for (let mipmap of mipmaps) {
-      let faceMipMaps = <CubemapFaces>{
-        posx: await Compatibility.assets.load<Texture>(mipmap[0]),
-        negx: await Compatibility.assets.load<Texture>(mipmap[1]),
-        posy: await Compatibility.assets.load<Texture>(mipmap[2]),
-        negy: await Compatibility.assets.load<Texture>(mipmap[3]),
-        posz: await Compatibility.assets.load<Texture>(mipmap[4]),
-        negz: await Compatibility.assets.load<Texture>(mipmap[5]),
-      }
-      textures.push(faceMipMaps)
-    }
-    let cubemap = Cubemap.fromFaces(textures)
-    cubemap.cubemapFormat = version.format
-    return cubemap
+    return Cubemap.fromMipmaps(mipmaps, version.format)
   },
 }
 
-Compatibility.installLoaderPlugin("cubemap", CubemapLoader)
+extensions.add(CubemapLoader)

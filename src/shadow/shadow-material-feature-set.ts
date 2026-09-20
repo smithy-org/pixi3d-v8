@@ -1,7 +1,6 @@
-import { Renderer } from "@pixi/core"
-
+import { WebGLRenderer } from "pixi.js"
 export namespace ShadowMaterialFeatureSet {
-  export function build(renderer: Renderer, features: string[] = []) {
+  export function build(renderer: WebGLRenderer, features: string[] = []) {
     if (renderer.context.webGLVersion === 1) {
       features.push("WEBGL1 1")
     }
